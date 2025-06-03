@@ -1,0 +1,94 @@
+/* AG Grid wrapper look and feel */
+.ag-theme-alpine {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem; /* text-sm */
+    color: #374151; /* text-gray-700 */
+    background-color: #872525; /* bg-white */
+    border-radius: 0.5rem; /* rounded-lg */
+    overflow: hidden;
+    border: 1px solid #e5e7eb; /* border-gray-200 */
+}
+
+/* Header */
+.ag-header {
+    background-color: rgb(0, 145, 153); /* bg-gray-100 */
+    border-bottom: 1px solid #e5e7eb; /* border-gray-200 */
+    font-weight: bold;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    height: 40px !important;
+}
+
+.ag-header-cell {
+    line-height: 1.25rem;  /* leading-5 */
+    vertical-align: middle;
+    height: auto !important;
+}
+
+.ag-header-cell-label {
+    font-weight: 600;
+    font-size: 0.875rem;    /* text-sm */
+    color: #ffffff;         /* text-gray-900 */
+}
+
+/* Cells */
+.ag-cell {
+    /*padding: 0.75rem 1rem; !* Tailwind: py-3 px-4 *!*/
+    font-size: 0.875rem;   /* text-sm */
+    line-height: 1.25rem;  /* leading-5 */
+    color: #374151;        /* text-gray-700 */
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    /*text-overflow: ellipsis;*/
+}
+
+/* Zebra striping */
+.ag-row:nth-child(even) {
+    background-color: #f9fafb; /* bg-gray-50 */
+}
+
+/* Row hover */
+.ag-row-hover {
+    background-color: #f3f4f6 !important; /* bg-gray-100 */
+}
+
+/* Pagination */
+.ag-paging-panel {
+    height: 50px;
+    font-size: 12px;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #ffffff;
+    border-top: 1px solid #e5e7eb; /* border-gray-200 */
+    padding: 0.5rem 1rem; /* py-2 px-4 */
+}
+
+/* Scrollbar styling for WebKit */
+.ag-body-viewport::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.ag-body-viewport::-webkit-scrollbar-thumb {
+    background-color: #d1d5db; /* gray-300 */
+    border-radius: 4px;
+}
+
+/* Optional: border between columns */
+.ag-cell:not(:last-child) {
+    border-right: 1px solid #f3f4f6;
+}
+
+/* Rounded borders on outer container */
+.ag-root-wrapper {
+    border-radius: 0.5rem;
+}
+
+.ag-theme-alpine .ag-floating-filter {
+    padding: 4px 8px;
+}
+
+.ag-input-wrapper:before {
+    display: none;
+}
+
+
