@@ -37,7 +37,7 @@ services:
         build:
             context: .
         ports:
-            - "9300:9000"  # PHP-FPM port
+            - "9400:9000"  # PHP-FPM port
         volumes:
             - .:/var/www
         depends_on:
