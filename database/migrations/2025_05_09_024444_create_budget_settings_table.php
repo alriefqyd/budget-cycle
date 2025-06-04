@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('project_id');
             $table->decimal('budget_cost', 18, 2)->nullable();
             $table->decimal('actual_to_date', 18, 2)->nullable();
-            $table->decimal('budget_car ', 18, 2)->nullable();
+            $table->decimal('budget_car', 18, 2)->nullable();
             $table->decimal('budget_5yp', 18, 2)->nullable();
             $table->integer('start_year')->nullable();
             $table->string('num_of_year_budget')->nullable(); // assuming string like "0-5"
