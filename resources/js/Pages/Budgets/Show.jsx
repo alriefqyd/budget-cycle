@@ -138,6 +138,17 @@ export default function Show() {
         filter: 'agTextColumnFilter',
         minWidth: 150,
         valueFormatter: params => formatCurrency(params.value)
+    },
+    {
+        headerName: "Cost Remaining",
+            field: 'cost_remaining',
+        filter: 'agTextColumnFilter',
+        minWidth: 150,
+        valueFormatter: params => formatCurrency(params.value),
+        cellClassRules: {
+        'negative-value': params => params.value < 0,
+        'positive-value': params => params.value >= 0
+    }
     })
 
     const [rowData, setRowData] = useState([]);
@@ -170,7 +181,7 @@ export default function Show() {
             const newEndYear = newStartYear + parseInt(years) - 1;
 
             for (let year = startYear; year <= endYear; year++) {
-                const field = `cash_${year}`;
+                let field = `cash_${year}`;
                 if (year >= newStartYear && year <= newEndYear) {
                     data[field] = budgetPerYear;
                 } else {
@@ -204,10 +215,14 @@ export default function Show() {
                 let rem = parseFloat(data['budget_5yp']) - total;
                 data['cash_remaining'] = rem;
             }
+            if(totalField === "total_cost"){
+                let rem = parseFloat(data['budget_5yp']) - total;
+                data['cost_remaining'] = rem;
+            }
 
             api.refreshCells({
                 rowNodes: [node],
-                columns: [totalField, 'cash_remaining'],
+                columns: [totalField, 'cash_remaining','cost_remaining'],
                 force: true
             });
         };
