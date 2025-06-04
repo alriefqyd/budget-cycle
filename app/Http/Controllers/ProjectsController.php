@@ -40,7 +40,7 @@ class ProjectsController extends Controller
                     'note' => $project->note,
                     'sap_code' => $project->sap_code,
                     'project_manager' => $project->project_manager,
-                    'pc' => $project->pc,
+                    'project_control' => $project->project_control,
                     'directorate' => $project->directorate,
                     'owner_area' => $project->owner_area,
                     'type_of_investment' => $project->type_of_investment,
@@ -54,6 +54,8 @@ class ProjectsController extends Controller
                     'num_of_year_budget'=>$project->budgets?->num_of_year_budget,
                     'total_cash' => $project->budgets?->total_cash,
                     'total_cost' => $project->budgets?->total_cost,
+                    'cash_remaining' => $project->budgets?->cash_remaining,
+                    'cost_remaining' => $project->budgets?->cost_remaining,
                 ];
 
                 // Add dynamic cash_YYYY and cost_YYYY fields
@@ -114,7 +116,8 @@ class ProjectsController extends Controller
                 'total_cost' => $request->total_cost,
                 'cost_remaining' => $request->cost_remaining,
                 'budget_car' => $request->budget_car,
-                'project_id' => $request->id
+                'project_id' => $request->id,
+                'cash_remaining' => $request->cash_remaining,
             ]);
         }
 

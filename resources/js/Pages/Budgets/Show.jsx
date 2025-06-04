@@ -18,8 +18,10 @@ import {
     TextEditorModule,
     SelectEditorModule,
     ClientSideRowModelApiModule,
-    RenderApiModule
+    RenderApiModule,
+    CellStyleModule
 } from 'ag-grid-community';
+import {data} from "autoprefixer";
 
 ModuleRegistry.registerModules([
     ClientSideRowModelModule,
@@ -30,12 +32,18 @@ ModuleRegistry.registerModules([
     TextEditorModule,
     SelectEditorModule,
     ClientSideRowModelApiModule,
-    RenderApiModule
+    RenderApiModule,
+    CellStyleModule
 ]);
 
 export default function Show() {
     const gridRef = useRef();
     const { projects, year, budgets } = usePage().props
+
+    const pathParts = window.location.pathname.split('/');
+    const startYear = parseInt(pathParts[pathParts.length - 1]) || new Date().getFullYear();
+    const endYear = startYear + 4;
+
     const columnDefs = [
         { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:true},
         { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40},
@@ -44,50 +52,83 @@ export default function Show() {
         { headerName: "Status", field: "status_progress", filter: 'agTextColumnFilter', cellEditor: 'agSelectCellEditor',cellEditorParams: {
                 values: ['ongoing', 'new'],
             } },
-        { headerName: "PM", field: "project_manager", filter: 'agTextColumnFilter' },
-        { headerName: "PC", field: "project_control", filter: 'agTextColumnFilter' },
-        { headerName: "Director", field: "directorate", filter: 'agTextColumnFilter' },
-        { headerName: "Owner Area", field: "owner_area", filter: 'agTextColumnFilter' },
-        { headerName: "Type of Investment", field: "type_of_investment", filter: 'agTextColumnFilter', cellEditor: 'agSelectCellEditor',cellEditorParams: {
+        { headerName: "PM", field: "project_manager", filter: 'agTextColumnFilter', minWidth: 220 },
+        { headerName: "PC", field: "project_control", filter: 'agTextColumnFilter', minWidth: 150 },
+        { headerName: "Director", field: "directorate", filter: 'agTextColumnFilter', minWidth: 75 },
+        { headerName: "Owner Area", field: "owner_area", filter: 'agTextColumnFilter', minWidth: 200 },
+        { headerName: "Type of Investment", field: "type_of_investment", filter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
             values: ['English', 'Spanish', 'French', 'Portuguese'],
             } },
-        { headerName: "Category", field: "category", filter: 'agTextColumnFilter', agTextColumnFilter: 'agTextColumnFilter', cellEditor: 'agSelectCellEditor',cellEditorParams: {
+        { headerName: "Category", field: "category", filter: 'agTextColumnFilter', agTextColumnFilter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
             values: ['English', 'Spanish', 'French', 'Portuguese'],
             } },
-        { headerName: "Risk", field: "risk", filter: 'agTextColumnFilter' },
-        { headerName: "Budget Car", field: "budget_car", filter: 'agTextColumnFilter' },
-        { headerName: "Actual to Date", field: "actual_to_date", filter: 'agTextColumnFilter' },
-        { headerName: "Budget 5YP", field: "budget_5yp", filter: 'agNumberColumnFilter'}, // Use number filter if this is numeric]
-        { headerName: "Start Year", field: "start_year", filter: 'agTextColumnFilter' },
-        { headerName: "Num Of Year Budget", field: "num_of_year_budget", filter: 'agTextColumnFilter', cellEditor: "agSelectCellEditor", cellEditorParams: {
-                values: ['1', '2', '3', '4','5'],
-        }},
+        { headerName: "Risk", field: "risk", filter: 'agTextColumnFilter', minWidth: 50 },
+        { headerName: "Budget Car", field: "budget_car", filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Actual to Date", field: "actual_to_date", filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Budget 5YP", field: "budget_5yp", filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+        { headerName: "Start Year", field: "start_year", filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
+                const values = [];
+                for (let year = startYear; year <= endYear; year++) {
+                    values.push(year); // Must be strings
+                }
+                return { values };
+            } },
+        { headerName: "Budget Year", field: "num_of_year_budget", filter: 'agTextColumnFilter', minWidth: 150, cellEditor: "agSelectCellEditor",
+            cellEditorParams: (params) => {
+                const values = [];
+                const start = parseInt(params.data?.start_year) || new Date().getFullYear();
+                const maxYears = endYear - start + 1;
+
+                for (let num = 1; num <= 5; num++) {
+                    if (num <= maxYears) {
+                        values.push(num.toString()); // must be string
+                    }
+                }
+
+                return { values };
+            }
+        },
         { headerName: "FM New", field: "fm_new", filter: 'agTextColumnFilter' },
     ]
-
-    const pathParts = window.location.pathname.split('/');
-    const startYear = parseInt(pathParts[pathParts.length - 1]) || new Date().getFullYear();
-    const endYear = startYear + 4;
 
     for (let year = startYear; year <= endYear; year++) {
         columnDefs.push({
             headerName: `Cash - ${year}`,
             field: `cash_${year}`,
             filter: 'agNumberColumnFilter',
+            minWidth: 150,
+            valueFormatter: params => formatCurrency(params.value)
         });
     }
 
-    columnDefs.push({
-        headerName: "Cash Total",
-        field: `total_cash`,
-        filter: 'agTextColumnFilter',
-    })
+    columnDefs.push(
+        {
+            headerName: "Cash Total",
+            field: `total_cash`,
+            filter: 'agTextColumnFilter',
+            minWidth: 150,
+            valueFormatter: params => formatCurrency(params.value)
+        },
+        {
+            headerName: "Cash Remaining",
+            field: 'cash_remaining',
+            filter: 'agTextColumnFilter',
+            minWidth: 150,
+            valueFormatter: params => formatCurrency(params.value),
+            cellClassRules: {
+                'negative-value': params => params.value < 0,
+                'positive-value': params => params.value >= 0
+            }
+        }
+    )
 
     for (let year = startYear; year <= endYear; year++) {
         columnDefs.push({
             headerName: `Cost - ${year}`,
             field: `cost_${year}`,
             filter: 'agNumberColumnFilter',
+            minWidth: 150,
+            valueFormatter: params => formatCurrency(params.value)
         });
     }
 
@@ -95,9 +136,9 @@ export default function Show() {
         headerName: "Cost Total",
         field: `total_cost`,
         filter: 'agTextColumnFilter',
+        minWidth: 150,
+        valueFormatter: params => formatCurrency(params.value)
     })
-
-
 
     const [rowData, setRowData] = useState([]);
     useEffect(() => {
@@ -112,7 +153,13 @@ export default function Show() {
         minWidth: 120,
         editable: true,
     }
-
+    const formatCurrency = (value) => {
+        if (value == null || isNaN(value)) return '';
+        return Number(value).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    };
 
     const onCellValueChanged = async (params) => {
         const { data, colDef, api, node } = params;
@@ -131,7 +178,12 @@ export default function Show() {
                 }
             }
 
-            data['total_cash'] = budgets;
+            if(colDef.field === 'budget_5yp'){
+                data['total_cash'] = budgets;
+            } else {
+                data['budget_5yp'] = budgets;
+            }
+
 
             api.refreshCells({
                 rowNodes: [node],
@@ -146,11 +198,16 @@ export default function Show() {
                 const value = parseFloat(data[field]) || 0;
                 total += value;
             }
+
             data[totalField] = total;
+            if(totalField === "total_cash"){
+                let rem = parseFloat(data['budget_5yp']) - total;
+                data['cash_remaining'] = rem;
+            }
 
             api.refreshCells({
                 rowNodes: [node],
-                columns: [totalField],
+                columns: [totalField, 'cash_remaining'],
                 force: true
             });
         };
@@ -166,6 +223,10 @@ export default function Show() {
 
         if (colDef.field === 'budget_5yp' || colDef.field === 'num_of_year_budget' || colDef.field === 'start_year') {
             budgetDistribute(data['budget_5yp'], data['num_of_year_budget']);
+        }
+
+        if(colDef.field === 'total_cash'){
+            budgetDistribute(data['total_cash'], data['num_of_year_budget']);
         }
 
         try {

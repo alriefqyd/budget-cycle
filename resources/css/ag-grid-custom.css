@@ -91,4 +91,16 @@
     display: none;
 }
 
+.negative-value {
+    background-color: #ffdddd !important;
+    color: red;
+    font-weight: bold;
+}
+
+.positive-value {
+    background-color: #ddffdd !important; /* light green */
+    color: green;
+    font-weight: bold;
+}
+
 
