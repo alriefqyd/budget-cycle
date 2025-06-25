@@ -1,4 +1,4 @@
-import {useEffect, useState, useRef} from "react"
+import {useEffect, useState, useRef, useMemo} from "react"
 import { usePage } from "@inertiajs/react"
 import { AgGridReact } from "ag-grid-react"
 import "../../../css/ag-grid-custom.css";
@@ -19,7 +19,10 @@ import {
     SelectEditorModule,
     ClientSideRowModelApiModule,
     RenderApiModule,
-    CellStyleModule
+    CellStyleModule,
+    RowSelectionModule,
+    HighlightChangesModule,
+    UndoRedoEditModule
 } from 'ag-grid-community';
 import {data} from "autoprefixer";
 
@@ -33,20 +36,79 @@ ModuleRegistry.registerModules([
     SelectEditorModule,
     ClientSideRowModelApiModule,
     RenderApiModule,
-    CellStyleModule
+    CellStyleModule,
+    RowSelectionModule,
+    HighlightChangesModule,
+    UndoRedoEditModule
 ]);
 
 export default function Show() {
     const gridRef = useRef();
     const { projects, year, budgets } = usePage().props
+    const [activeTab, setActiveTab] = useState('Tab1');
 
     const pathParts = window.location.pathname.split('/');
     const startYear = parseInt(pathParts[pathParts.length - 1]) || new Date().getFullYear();
     const endYear = startYear + 4;
+    const yearlyBudget = startYear + 2;
+    const month = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    const toSentenceCase = (str) => {
+        if (!str) return "";
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    };
+    const generateTwoYearYearly = (year,type) => {
+        month.forEach((month,index) => {
+            let color = 'custom-header-blue'
+            if(type == 'cash') {
+                color = 'custom-header-gray'
+            }
+            columnDefs.push({
+                headerName: `${toSentenceCase(type)} ${month} - ${year}`,
+                field: `${type}_${index+1}_${year}`,
+                filter: 'agNumberColumnFilter',
+                minWidth: 170,
+                hide: activeTab === 'Tab1' ? true : false,
+                headerClass: color,
+                valueFormatter: params => formatCurrency(params.value),
+            });
+        });
+    }
+
+    const getMonthYear = (colDef, type) => {
+        let fieldType = colDef.field.split("_")[0];
+        const regex = new RegExp(`^${fieldType}_(\\d{1,2})_(\\d{4})$`);
+        const match = colDef.field.match(regex);
+        if(match) {
+            let month = match[2].length > 0 ? match[1] : null;
+            let year = match[2].length > 0 ? match[2] : match[1];
+
+            if(month){
+                month = parseInt(month,10);
+            }
+
+            year = parseInt(year, 10);
+
+            if(type === 'month') {
+                return month;
+            }
+            return year
+        }
+    }
+
+    const replicateCostToCash = (data, colDef) => {
+        let month = getMonthYear(colDef, 'month');
+        let year = getMonthYear(colDef, 'year');
+        const top = data['top'] ? parseInt(data['top']) : 1;
+        let columnToReplicate = `cash_${month + top}_${year}`
+        data[columnToReplicate] = data[colDef.field] || 0;
+    }
+
 
     const columnDefs = [
         { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:true},
-        { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40},
+        { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true, // ✅ Show checkbox per row
+            headerCheckboxSelection: true},
         { headerName: "Project's Title", field: "project_title",pinned:'left', width: 300},
         { headerName: "Note", field: "note", filter: 'agTextColumnFilter' },
         { headerName: "Status", field: "status_progress", filter: 'agTextColumnFilter', cellEditor: 'agSelectCellEditor',cellEditorParams: {
@@ -69,7 +131,7 @@ export default function Show() {
         { headerName: "Start Year", field: "start_year", filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
-                    values.push(year); // Must be strings
+                    values.push(year.toString()); // Must be strings
                 }
                 return { values };
             } },
@@ -89,16 +151,135 @@ export default function Show() {
             }
         },
         { headerName: "FM New", field: "fm_new", filter: 'agTextColumnFilter' },
+        { headerName: "Top",  field: "top", filter: 'agTextColumnFilter', minWidth:90, hide: activeTab === 'Tab1' ? true : false, cellEditor: "agSelectCellEditor", enableCellChangeFlash: true,
+            cellEditorParams: (params) => {
+                const values = [];
+                for (let num = 1; num < 12; num++) {
+                    values.push(num.toString()); // must be string
+                }
+
+                return { values };
+            }
+
+        }
     ]
 
     for (let year = startYear; year <= endYear; year++) {
+        if(year < yearlyBudget) {
+            generateTwoYearYearly(year,'cost')
+            columnDefs.push(
+                {
+                    headerName: `Total`,
+                    field: `total_cost_${year}`,
+                    filter: 'agNumberColumnFilter',
+                    minWidth: 170,
+                    headerClass: 'custom-header-red',
+                    editable:false,
+                    hide: activeTab === 'Tab1'  ? true : false,
+                    valueFormatter: params => formatCurrency(params.value),
+                }
+            )
+        }
+        let hide = activeTab === 'Tab1' || (activeTab == 'Tab2' && year < yearlyBudget) ? false : true
+
+        columnDefs.push(
+        {
+            headerName: `Cost - ${year}`,
+            field: `cost_${year}`,
+            filter: 'agNumberColumnFilter',
+            minWidth: 150,
+            hide: hide,
+            headerClass:'custom-header-orange',
+            valueFormatter: params => formatCurrency(params.value)
+        }
+        );
+
+        if(year < yearlyBudget){
+            columnDefs.push(
+                {
+                    headerName: `Cost - ${year} - Remaining`,
+                    field: `cost_${year}_remaining`,
+                    filter: 'agNumberColumnFilter',
+                    minWidth: 220,
+                    hide: activeTab === 'Tab1'  ? true : false,
+                    headerClass:'custom-header-green-2',
+                    cellClassRules: {
+                        'negative-value': params => params.value < 0,
+                        'positive-value': params => params.value >= 0
+                    }
+                }
+            )
+        }
+    }
+
+    columnDefs.push({
+            headerName: "Cost Total",
+            field: `total_cost`,
+            filter: 'agTextColumnFilter',
+            minWidth: 150,
+            editable:false,
+            headerClass:'custom-header-orange',
+            hide: activeTab === 'Tab1' ? false : true,
+            valueFormatter: params => formatCurrency(params.value)
+        },
+        {
+            headerName: "Cost Remaining",
+            field: 'cost_remaining',
+            filter: 'agTextColumnFilter',
+            minWidth: 150,
+            editable: false,
+            headerClass:'custom-header-orange',
+            hide: activeTab === 'Tab1' ? false : true,
+            valueFormatter: params => formatCurrency(params.value),
+            cellClassRules: {
+                'negative-value': params => params.value < 0,
+                'positive-value': params => params.value >= 0
+            }
+        })
+
+    for (let year = startYear; year <= endYear; year++) {
+        if(year < yearlyBudget) {
+            generateTwoYearYearly(year,'cash')
+            columnDefs.push(
+                {
+                    headerName: `Total Cash - ${year}`,
+                    field: `total_cash_${year}`,
+                    filter: 'agNumberColumnFilter',
+                    minWidth: 170,
+                    headerClass: 'custom-header-red',
+                    editable:false,
+                    hide: activeTab === 'Tab1'  ? true : false,
+                    valueFormatter: params => formatCurrency(params.value),
+                }
+            )
+        }
+        let hide = activeTab === 'Tab1' || (activeTab == 'Tab2' && year < yearlyBudget) ? false : true
         columnDefs.push({
             headerName: `Cash - ${year}`,
             field: `cash_${year}`,
             filter: 'agNumberColumnFilter',
             minWidth: 150,
-            valueFormatter: params => formatCurrency(params.value)
+            headerClass:'custom-header-green',
+            valueFormatter: params => formatCurrency(params.value),
+            hide: hide,
         });
+
+        if(year < yearlyBudget){
+            columnDefs.push(
+                {
+                    headerName: `Cash - ${year} - Remaining`,
+                    field: `cash_${year}_remaining`,
+                    filter: 'agNumberColumnFilter',
+                    minWidth: 220,
+                    hide: activeTab === 'Tab1' ? true : false,
+                    headerClass:'custom-header-green',
+                    cellClassRules: {
+                        'negative-value': params => params.value < 0,
+                        'positive-value': params => params.value >= 0
+                    }
+                }
+            )
+        }
     }
 
     columnDefs.push(
@@ -107,6 +288,9 @@ export default function Show() {
             field: `total_cash`,
             filter: 'agTextColumnFilter',
             minWidth: 150,
+            editable:false,
+            headerClass:'custom-header-green',
+            hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value)
         },
         {
@@ -114,6 +298,9 @@ export default function Show() {
             field: 'cash_remaining',
             filter: 'agTextColumnFilter',
             minWidth: 150,
+            editable:false,
+            headerClass:'custom-header-green',
+            hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value),
             cellClassRules: {
                 'negative-value': params => params.value < 0,
@@ -122,35 +309,7 @@ export default function Show() {
         }
     )
 
-    for (let year = startYear; year <= endYear; year++) {
-        columnDefs.push({
-            headerName: `Cost - ${year}`,
-            field: `cost_${year}`,
-            filter: 'agNumberColumnFilter',
-            minWidth: 150,
-            valueFormatter: params => formatCurrency(params.value)
-        });
-    }
-
-    columnDefs.push({
-        headerName: "Cost Total",
-        field: `total_cost`,
-        filter: 'agTextColumnFilter',
-        minWidth: 150,
-        valueFormatter: params => formatCurrency(params.value)
-    },
-    {
-        headerName: "Cost Remaining",
-            field: 'cost_remaining',
-        filter: 'agTextColumnFilter',
-        minWidth: 150,
-        valueFormatter: params => formatCurrency(params.value),
-        cellClassRules: {
-        'negative-value': params => params.value < 0,
-        'positive-value': params => params.value >= 0
-    }
-    })
-
+    // const [rowData, setRowData] = useState([]);
     const [rowData, setRowData] = useState([]);
     useEffect(() => {
         setRowData(budgets);
@@ -172,21 +331,79 @@ export default function Show() {
         });
     };
 
+    const handleAddNewRow = () => {
+        const newRow = {
+            id: null,
+            sap_code: '',
+            project_title: '',
+            note: '',
+            status_progress: 'new',
+            project_manager: '',
+            project_control: '',
+            directorate: '',
+            owner_area: '',
+            type_of_investment: '',
+            category: '',
+            risk: '',
+            budget_car: 0,
+            actual_to_date: 0,
+            budget_5yp: 0,
+            start_year: startYear,
+            num_of_year_budget: 1,
+            fm_new: '',
+            top: 1,
+            total_cash: 0,
+            total_cost: 0,
+            cash_remaining: 0,
+            cost_remaining: 0
+        };
+
+        for (let year = startYear; year <= endYear; year++) {
+            newRow[`cost_${year}`] = 0;
+            newRow[`cash_${year}`] = 0;
+            newRow[`cost_${year}_remaining`] = 0;
+            newRow[`cash_${year}_remaining`] = 0;
+
+            for (let i = 1; i <= 12; i++) {
+                newRow[`cost_${i}_${year}`] = 0;
+                newRow[`cash_${i}_${year}`] = 0;
+            }
+        }
+
+        agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
+    };
+
+
     const onCellValueChanged = async (params) => {
         const { data, colDef, api, node } = params;
 
+
+        const budgetDistributeMonthly = (budgetPerYear, year) => {
+            let budgetPerMonth = 0;
+            if(year < yearlyBudget && year >= data['start_year']) {
+                budgetPerMonth = budgetPerYear / 12;
+            }
+
+            month.forEach((month,index) => {
+                data[`cost_${index+1}_${year}`] = budgetPerMonth;
+            })
+        }
         const budgetDistribute = (budgets, years) => {
             const budgetPerYear = budgets / years;
             const newStartYear = parseInt(data['start_year']);
             const newEndYear = newStartYear + parseInt(years) - 1;
 
             for (let year = startYear; year <= endYear; year++) {
-                let field = `cash_${year}`;
+                let fieldCost = `cost_${year}`;
+                let fieldCash = `cash_${year}`;
                 if (year >= newStartYear && year <= newEndYear) {
-                    data[field] = budgetPerYear;
+                    data[fieldCash] = budgetPerYear;
+                    data[fieldCost] = budgetPerYear;
                 } else {
-                    data[field] = 0;
+                    data[fieldCash] = 0;
+                    data[fieldCost] = 0;
                 }
+                budgetDistributeMonthly(budgetPerYear, year)
             }
 
             if(colDef.field === 'budget_5yp'){
@@ -195,6 +412,8 @@ export default function Show() {
                 data['budget_5yp'] = budgets;
             }
 
+            updateTotal('cash','total_cash');
+            updateTotal('cost','total_cost');
 
             api.refreshCells({
                 rowNodes: [node],
@@ -202,14 +421,7 @@ export default function Show() {
             });
         };
 
-        const updateTotal = (prefix, totalField) => {
-            let total = 0;
-            for (let year = startYear; year <= endYear; year++) {
-                const field = `${prefix}_${year}`;
-                const value = parseFloat(data[field]) || 0;
-                total += value;
-            }
-
+        const countBudgetRemaining = (total,totalField) => {
             data[totalField] = total;
             if(totalField === "total_cash"){
                 let rem = parseFloat(data['budget_5yp']) - total;
@@ -219,21 +431,117 @@ export default function Show() {
                 let rem = parseFloat(data['budget_5yp']) - total;
                 data['cost_remaining'] = rem;
             }
+        }
 
+        const updateTotal = (prefix, totalField) => {
+            let total = 0;
+            for (let year = startYear; year <= endYear; year++) {
+                const field = `${prefix}_${year}`;
+                const value = parseFloat(data[field]) || 0;
+                total += value;
+            }
+            countBudgetRemaining(total, totalField);
             api.refreshCells({
                 rowNodes: [node],
-                columns: [totalField, 'cash_remaining','cost_remaining'],
+                columns: [totalField, 'cash_remaining','cost_remaining',`${prefix}_${year}_remaining`],
                 force: true
             });
         };
 
-        // Check if cash field changed
-        if (colDef.field?.startsWith("cash_")) {
-            updateTotal("cash", "total_cash");
+        const cashDistribute = (data) => {
+            const cash = {};
+            let budgetYear = 0;
+            for (let i = 0; i < 12; i++) {
+                const costMonth = i;
+                const cashMonthIndex = i + (data['top'] ? parseInt(data['top'])  : 0);
+                console.log(cashMonthIndex)
+                budgetYear += data[`cost_${i}_${year}`];
+                if (cashMonthIndex <= 12) {
+                    const cashMonth = cashMonthIndex;
+                    [startYear, startYear + 1].forEach((year) => {
+                        data[`cash_${cashMonthIndex}_${year}`] = data[`cost_${i}_${year}`];
+                        data[`cash_${year}_remaining`] = 0;
+                        data[`cost_${year}_remaining`] = 0;
+                    })
+                }
+            }
+
+            return cash;
         }
 
-        if (colDef.field?.startsWith("cost_")) {
+        const updateCostMonthlyRemaining = (value, column) => {
+            let month = getMonthYear(column, 'month');
+            let year = getMonthYear(column, 'year');
+
+            if(!year){
+                year = column.field.split('_')[1];
+            }
+
+            let type = column.field.split("_")[0]; // "cost" or "cash"
+            let total = 0;
+
+            Object.keys(value).forEach((key) => {
+                const regex = new RegExp(`^${type}_(\\d{1,2})_${year}$`);
+                if (regex.test(key)) {
+                    console.log(value[key]);
+                    total += parseFloat(value[key] || 0);
+                }
+            });
+
+            let remaining = parseInt(value[`${type}_${year}`]) - total
+            value[`${type}_${year}_remaining`] = remaining;
+            value[`total_${type}_${year}`] = total;
+
+            api.refreshCells({
+                rowNodes: [node],
+                force: true
+            });
+        };
+
+        const updateTotalMonthly = (type, year) => {
+            let total = 0;
+            month.forEach((month,index) => {
+                total += parseFloat(data[`${type}_${index+1}_${year}`]);
+            });
+            data[`total_${type}_${year}`] = total;
+        }
+
+
+        // Check if cash field changed
+        if (/^cash_\d{4}$/.test(colDef.field)) {
+            updateTotal("cash", "total_cash");
+            updateCostMonthlyRemaining(data, colDef)
+        }
+
+        if (/^cost_\d{4}$/.test(colDef.field)) {
+            const budgetPerYear = data['budget_5yp'] / data['num_of_year_budget']
+            const year = colDef.field.split("_")[1];
+            const type = colDef.field.split("_")[0];
+
             updateTotal("cost", "total_cost");
+            if(activeTab === 'Tab1'){
+                budgetDistributeMonthly(budgetPerYear, parseInt(year))
+            }
+            updateCostMonthlyRemaining(data, colDef)
+            updateTotalMonthly('cost',year)
+
+            api.refreshCells({
+                rowNodes: [node],
+                force: true
+            });
+
+        }
+
+        if(/^cost_(1[0-2]|[1-9])_\d{4}$/.test(colDef.field)) {
+            replicateCostToCash(data, colDef)
+            updateCostMonthlyRemaining(data, colDef)
+            updateTotalMonthly('cost', colDef.field.split("_")[2])
+
+        }
+
+        if(/^cash_(1[0-2]|[1-9])_\d{4}$/.test(colDef.field)) {
+            updateCostMonthlyRemaining(data, colDef)
+            updateTotalMonthly('cash',colDef.field.split("_")[2])
         }
 
         if (colDef.field === 'budget_5yp' || colDef.field === 'num_of_year_budget' || colDef.field === 'start_year') {
@@ -244,27 +552,38 @@ export default function Show() {
             budgetDistribute(data['total_cash'], data['num_of_year_budget']);
         }
 
+        if(colDef.field === 'top'){
+            cashDistribute(data)
+        }
+
         try {
-            const response = await fetch(`/budgets/${data.id}`, {
-                method: 'PUT',
+            const isNew = !data.id; // if no ID, it's new
+            data['period_year'] = startYear
+
+            const response = await fetch(isNew ? '/budgets' : `/budgets/${data.id}`, {
+                method: isNew ? 'POST' : 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify(data)
-            });
+            })
 
             const result = await response.json();
-
             if (!response.ok) {
-                throw new Error(result.message || "Failed to update");
+                console.error("Failed to update budget record:", result);
+                alert("An error occurred while updating the data. Please try again.");
             }
 
-            console.log("Saved successfully", result.data);
+            if (isNew && result.data?.id) {
+                data.id = result.data.id;
+                agGridRef.current.api.applyTransaction({ update: [data] });
+            }
+
+            console.log(result.message, result.data);
         } catch (error) {
             console.error("Update error:", error);
-            alert("Failed to update data. Please try again.");
         }
     };
 
@@ -287,6 +606,8 @@ export default function Show() {
         }
     };
 
+    const agGridRef = useRef(); // <--- Add this
+
     return (
         <AuthenticatedLayout
             header={
@@ -296,7 +617,7 @@ export default function Show() {
             }
         >
             <ContainerWrapper>
-                <div className="mb-4 flex justify-between">
+                <div className="mb-4 flex">
                     <button
                         onClick={() => window.history.back()}
                         className="inline-flex items-center px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg shadow hover:bg-red-700 transition-all duration-200"
@@ -314,25 +635,58 @@ export default function Show() {
                     </button>
                     <button
                         onClick={handleFullscreen}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-700"
+                        className="px-4 py-2 ml-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-700"
                     >
                         ⛶ Fullscreen
                     </button>
-            </div>
-                <CardWrapper>
-                    <div ref={gridRef} className="ag-theme-alpine" style={{ height: "calc(100vh - 150px)", width: "100%" }}>
-                        <AgGridReact
-                            rowData={rowData}
-                            columnDefs={columnDefs}
-                            defaultColDef={defaultColDef}
-                            // pagination={true}
-                            // paginationPageSize={20}
-                            onCellValueChanged={onCellValueChanged}
-                            rowHeight={30}
-                        />
+                    <button
+                        onClick={handleAddNewRow}
+                        className="px-4 py-2 ml-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-700"
+                    >
+                         + Add New Row
+                    </button>
+                </div>
+                <CardWrapper mb="mb-3">
+                    <div className="space-x-4">
+                        <button
+                            className={`px-4 py-2 ${activeTab === 'Tab1' ? 'border-b-2 border-yellow-500 text-teal-700 font-semibold' : ''}`}
+                            onClick={() => {
+                                setActiveTab('Tab1');
+                            }}
+                        >
+                            Budget 5 Years
+                        </button>
+                        <button
+                            className={`px-4 py-2 ${activeTab === 'Tab2' ? 'border-b-2 border-yellow-500 text-teal-700 font-semibold' : ''}`}
+                            onClick={() => {
+                                setActiveTab('Tab2');
+                            }}
+                        >
+                            Budget Yearly
+                        </button>
                     </div>
                 </CardWrapper>
+                    <CardWrapper>
+                        <div ref={gridRef} className="ag-theme-alpine"
+                             style={{height: "calc(100vh - 150px)", width: "100%"}}>
+                            <AgGridReact
+                                ref={agGridRef}
+                                rowData={rowData}
+                                columnDefs={columnDefs}
+                                defaultColDef={defaultColDef}
+                                // pagination={true}
+                                // paginationPageSize={20}
+                                onCellValueChanged={onCellValueChanged}
+                                rowSelection="multiple"
+                                suppressRowClickSelection={true}
+                                undoRedoCellEditing={5}
+                                undoRedoCellEditingLimit={5}
+                            />
+                        </div>
+                    </CardWrapper>
             </ContainerWrapper>
         </AuthenticatedLayout>
     )
 }
+
+// any change will re count the cell

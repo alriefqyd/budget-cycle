@@ -6,6 +6,7 @@ use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
 use App\Models\BudgetSetting;
+use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
 use Illuminate\Http\Request;
@@ -18,11 +19,12 @@ use Maatwebsite\Excel\Facades\Excel;
 class ProjectsController extends Controller
 {
     public function index(){
-        $projects = Projects::get()->groupBy('year_period');
+        $projects = Projects::with('budgets')->get()->groupBy('year_period');
+        $projects = $projects->map(function ($group) {
+            return $group->values(); // ensure inner collections are clean arrays
+        });
         return Inertia::render('Budgets/Index', [
-            'projects' => $projects->map(function ($group) {
-                return $group->values(); // ensure inner collections are clean arrays
-            })
+            'projects' => $projects
         ]);
     }
 
@@ -58,12 +60,26 @@ class ProjectsController extends Controller
                     'cost_remaining' => $project->budgets?->cost_remaining,
                 ];
 
+
+
                 // Add dynamic cash_YYYY and cost_YYYY fields
                 if ($project->cashCostYearlies && $project->cashCostYearlies->count()) {
                     foreach ($project->cashCostYearlies as $budget) {
                         if (!empty($budget->type) && !empty($budget->year)) {
                             $fieldName = "{$budget->type}_{$budget->year}";
                             $item[$fieldName] = $budget->amount;
+                        }
+
+                        if(sizeof($budget?->cashCostMonthly) > 0){
+                            foreach ($budget?->cashCostMonthly as $monthly) {
+                                if (!empty($budget->type) && !empty($monthly->month)) {
+                                    $fieldName = "{$budget->type}_{$monthly->month}_{$budget->year}";
+                                    $item[$fieldName] = $monthly->amount;
+                                }
+                            }
+                            $totalYear = $budget->cashCostMonthly->sum('amount');
+                            $item['total_'.$budget->type.'_'.$budget->year] = $totalYear;
+                            $item[$budget->type.'_'.$budget->year.'_remaining'] = $budget->amount - $totalYear;
                         }
                     }
                 }
@@ -75,6 +91,32 @@ class ProjectsController extends Controller
         return Inertia::render('Budgets/Show', [
             'year' => $year,
             'budgets' => $budgets,
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $data = Projects::create([
+            'sap_code' => $request->sap_code,
+            'project_title' => $request->project_title,
+            'note' => $request->note,
+            'status_progress' => $request->status_progress,
+            'project_manager' => $request->project_manager,
+            'project_control' => $request->project_control,
+            'directorate' => $request->directorate,
+            'owner_area' => $request->owner_area,
+            'type_of_investment' => $request->type_of_investment,
+            'category' => $request->category,
+            'risk'=> $request->risk,
+            'fm_new' => $request->fm_new,
+            'year_period' => $request->period_year,
+            'start_year' => $request->year
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Budget create successfully',
+            'data' => $data
         ]);
     }
 
@@ -137,6 +179,28 @@ class ProjectsController extends Controller
                         'type' => $type,
                         'year' => $year,
                         'amount' => $value,
+                    ]);
+                }
+            }
+
+            if (preg_match('/^(cash|cost)_(1[0-2]|[1-9])_(\d{4})$/', $key, $match)) {
+                $type = $match[1]; // 'cash' or 'cost'
+                $month = $match[2];
+                $year = $match[3]; // e.g. '2025'
+
+                $yearlyId = CashCostYearly::where('year',$year)->where('type',$type)->where('project_id',$request->id)->first();
+                $costCashMonthly = CashCostMonthly::where('yearly_id', $yearlyId->id)->where('month', $month)->where('type', $type)->get();
+                if(sizeof($costCashMonthly) > 0){
+                    foreach ($costCashMonthly as $data) {
+                        $data->amount = $value;
+                        $data->save();
+                    }
+                } else {
+                    CashCostMonthly::create([
+                        'yearly_id' => $yearlyId->id,
+                        'month' => $month,
+                        'amount' => $value,
+                        'type' => $type,
                     ]);
                 }
             }

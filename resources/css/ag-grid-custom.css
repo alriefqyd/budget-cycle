@@ -10,12 +10,45 @@
 }
 
 /* Header */
+.custom-header-orange {
+    background-color: rgb(253, 190, 0); /* bg-gray-100 */
+    min-height: 49px !important;
+}
+.custom-header-orange-2 {
+    background-color: rgb(233, 183, 51); /* bg-gray-100 */
+    min-height: 49px !important;
+}
+
+.custom-header-gray{
+    background-color: rgba(248, 201, 113, 0.5);
+    min-height: 49px !important;
+}
+
+.custom-header-blue{
+    background-color: #2f74b4;
+    min-height: 49px !important;
+}
+
+.custom-header-green {
+    background-color: rgb(145, 206, 79); /* bg-gray-100 */
+    min-height: 49px !important;
+}
+
+.custom-header-red {
+    background-color: rgb(147, 25, 25); /* bg-gray-100 */
+    min-height: 49px !important;
+}
+
+.custom-header-green-2 {
+    background-color: rgb(87, 195, 90);
+    min-height: 49px !important;
+}
+
 .ag-header {
     background-color: rgb(0, 145, 153); /* bg-gray-100 */
     border-bottom: 1px solid #e5e7eb; /* border-gray-200 */
     font-weight: bold;
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    height: 40px !important;
 }
 
 .ag-header-cell {

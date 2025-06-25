@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@inertiajs/progress": "^0.2.7",
+    "ag-charts-react": "^11.3.2",
     "ag-grid-community": "^33.3.0",
     "ag-grid-react": "^33.3.0",
     "lucide-react": "^0.508.0",

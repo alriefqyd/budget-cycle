@@ -3,8 +3,69 @@ import { Head } from '@inertiajs/react';
 import StatCard from "@/Components/StatCard.jsx";
 import CardWrapper from "@/Components/CardWrapper.jsx";
 import ContainerWrapper from "@/Components/ContainerWrapper.jsx";
+import { AgCharts } from 'ag-charts-react';
+import { useState } from "react";
 
 export default function Dashboard() {
+    const [chartOptions, setChartOptions] = useState({
+        data: [
+            { year: '5YP', approved: 770, plan: 910 },
+            { year: '2024', approved: 143, plan: null },
+            { year: '2025', approved: 177, plan: 198 },
+            { year: '2026', approved: 187, plan: 216 },
+            { year: '2027', approved: 164, plan: 222 },
+            { year: '2028', approved: 100, plan: 171 },
+            { year: '2029', approved: null, plan: 104 },
+        ],
+        padding: {
+            top: 50, // increase this for label space above bars
+        },
+        title: {
+            text: '5YP 2025–2029 Sustaining Investment Highlights',
+            fontSize: 16,
+        },
+        series: [
+            {
+                type: 'bar',
+                xKey: 'year',
+                yKey: 'approved',
+                yName: 'Approved 2024–2028',
+                fill: '#F4B740',
+                grouped: true,
+                label: {
+                    enabled: true,
+                    placement: 'outside',
+                    fontWeight: 'bold',
+                    fontSize: 12,
+                    color: '#fff',
+                    formatter: ({ value }) => `${value ?? ''}`,
+                },
+            },
+            {
+                type: 'bar',
+                xKey: 'year',
+                yKey: 'plan',
+                yName: 'Plan 2025–2029',
+                fill: '#007B82',
+                grouped: true,
+                label: {
+                    enabled: true,
+                    placement: 'outside',
+                    fontWeight: 'bold',
+                    fontSize: 12,
+                    color: '#ffff',
+                    formatter: ({ value }) => `${value ?? ''}`,
+                },
+            },
+        ],
+        axes: [
+            { type: 'category', position: 'bottom', title: { text: 'Year' } },
+            { type: 'number', position: 'left', title: { text: 'Investment' } },
+        ],
+        legend: { position: 'bottom' },
+    });
+
+
     return (
         <AuthenticatedLayout
             header={
@@ -21,15 +82,11 @@ export default function Dashboard() {
                             <div>
                                 <h3 className="text-xl font-bold">Budget Chart</h3>
                                 <p className="text-sm text-gray-500 flex items-center gap-1">
-                                    <span className="text-green-500">▲</span> 86% More than last year
+                                    <span className="text-green-500">▲</span> Investment Comparison
                                 </p>
                             </div>
                         </div>
-                        {/* Placeholder for Chart */}
-                        <div
-                            className="mt-4 h-48 bg-gradient-to-b from-emerald-200 to-white rounded-lg flex items-center justify-center text-gray-400">
-                            Sales Chart Placeholder
-                        </div>
+                        <AgCharts options={chartOptions} className="p-3" style={{height: "calc(100vh - 150px)", width: "100%"}}/>
                     </div>
                 </div>
                 {/* Income and Loss Cards */}
@@ -38,9 +95,6 @@ export default function Dashboard() {
                     <StatCard label={"Our Annual Income"} value={"8,11,49"} percentage={"▲ 95.54%"}></StatCard>
                 </div>
             </ContainerWrapper>
-
-
-
         </AuthenticatedLayout>
     );
 }

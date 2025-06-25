@@ -13,4 +13,8 @@ class CashCostYearly extends Model
     public function projects(){
         return $this->belongsTo(Projects::class,'project_id','id');
     }
+    public function cashCostMonthly(){
+        return $this->hasMany(CashCostMonthly::class, 'yearly_id','id');
+    }
+
 }

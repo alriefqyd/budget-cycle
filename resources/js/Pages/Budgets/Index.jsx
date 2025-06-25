@@ -1,4 +1,4 @@
-import { useState } from "react";
+import {useEffect, useState} from "react";
 import { Head, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.jsx";
 import CardWrapper from "@/Components/CardWrapper.jsx";
@@ -15,6 +15,9 @@ export default function Dashboard() {
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
 
+    useEffect(() => {
+        router.reload({ only: ['projects'] });
+    },[projects])
     const handleUpload = async (data) => {
         setLoading(true);  // start loading
         const formData = new FormData();
@@ -37,8 +40,6 @@ export default function Dashboard() {
                 timer: 2000,
                 showConfirmButton: false,
             });
-
-            router.reload({ only: ['projects'] });
         } catch (error) {
             console.error(error);
 
@@ -92,9 +93,10 @@ export default function Dashboard() {
                                 <thead className="bg-teal-500 text-xs text-white uppercase font-semibold">
                                 <tr>
                                     <th className="px-4 py-3 text-center">Year</th>
-                                    <th className="px-4 py-3 text-right">Total</th>
+                                    <th className="px-4 py-3 text-right">Cash Total</th>
+                                    <th className="px-4 py-3 text-right">Cost Total</th>
                                     <th className="px-4 py-3 text-center">
-                                        Monthly Breakdown
+                                        Yearly Breakdown
                                     </th>
                                 </tr>
                                 </thead>
@@ -103,6 +105,7 @@ export default function Dashboard() {
                                     <RowTable
                                         key={groupKey}
                                         budget={groupKey}
+                                        item={groupItems}
                                         url={`/budgets/${groupKey}`}
                                     />
                                 ))}

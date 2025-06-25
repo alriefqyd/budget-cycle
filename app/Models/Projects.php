@@ -10,7 +10,6 @@ class Projects extends Model
     public function budgets(){
         return $this->hasOne(BudgetSetting::class, 'project_id','id');
     }
-
     public function cashCostYearlies(){
         return $this->hasMany(CashCostYearly::class, 'project_id','id');
     }
