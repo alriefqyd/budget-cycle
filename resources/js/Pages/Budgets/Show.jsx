@@ -24,7 +24,7 @@ import {
     HighlightChangesModule,
     UndoRedoEditModule
 } from 'ag-grid-community';
-import {data} from "autoprefixer";
+
 
 ModuleRegistry.registerModules([
     ClientSideRowModelModule,
@@ -670,41 +670,45 @@ export default function Show() {
             }
         >
             <ContainerWrapper>
-                <div className="mb-4 flex">
-                    <button
-                        onClick={() => window.history.back()}
-                        className="inline-flex items-center px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg shadow hover:bg-red-700 transition-all duration-200"
-                    >
-                        <svg
-                            className="w-5 h-5 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                            viewBox="0 0 24 24"
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => window.history.back()}
+                            className="inline-flex items-center px-2 py-2 bg-red-600 text-white text-sm font-medium rounded-lg shadow hover:bg-red-700 transition"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                        Back
-                    </button>
-                    <button
-                        onClick={handleFullscreen}
-                        className="px-4 py-2 ml-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-700"
-                    >
-                        ⛶ Fullscreen
-                    </button>
-                    <button
-                        onClick={handleAddNewRow}
-                        className="px-4 py-2 ml-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-700"
-                    >
-                        + Add New Row
-                    </button>
-                </div>
-                <div className="flex float-end">
-                    <button onClick={handleDuplicateRow}
-                            className="px-4 py-2 ml-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-700"
-                    >
-                        Duplicate
-                    </button>
+                            <svg
+                                className="w-5 h-5 mr-2"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                            Back
+                        </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleAddNewRow}
+                            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
+                        >
+                            + Add New Row
+                        </button>
+                        <button
+                            onClick={handleDuplicateRow}
+                            className="inline-flex items-center px-2 py-2 bg-yellow-500 text-white text-sm font-sm rounded-lg shadow hover:bg-yellow-600 transition"
+                        >
+                            ⧉ Duplicate
+                        </button>
+                        <button
+                            onClick={handleFullscreen}
+                            className="inline-flex items-center px-2 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg shadow hover:bg-blue-700 transition"
+                        >
+                            ⛶ Fullscreen
+                        </button>
+                    </div>
                 </div>
                 <CardWrapper mb="mb-3">
                     <div className="space-x-4">
@@ -726,25 +730,25 @@ export default function Show() {
                         </button>
                     </div>
                 </CardWrapper>
-                    <CardWrapper>
-                        <div ref={gridRef} className="ag-theme-alpine"
-                             style={{height: "calc(100vh - 150px)", width: "100%"}}>
-                            <AgGridReact
-                                ref={agGridRef}
-                                rowData={rowData}
-                                columnDefs={columnDefs}
-                                defaultColDef={defaultColDef}
-                                // pagination={true}
-                                // paginationPageSize={20}
-                                onCellValueChanged={onCellValueChanged}
-                                rowSelection="multiple"
-                                suppressRowClickSelection={true}
-                                undoRedoCellEditing={5}
-                                undoRedoCellEditingLimit={5}
-                                onSelectionChanged={onSelectionChanged}
-                            />
-                        </div>
-                    </CardWrapper>
+                <CardWrapper>
+                    <div ref={gridRef} className="ag-theme-alpine"
+                         style={{height: "calc(100vh - 150px)", width: "100%"}}>
+                        <AgGridReact
+                            ref={agGridRef}
+                            rowData={rowData}
+                            columnDefs={columnDefs}
+                            defaultColDef={defaultColDef}
+                            // pagination={true}
+                            // paginationPageSize={20}
+                            onCellValueChanged={onCellValueChanged}
+                            rowSelection="multiple"
+                            suppressRowClickSelection={true}
+                            undoRedoCellEditing={5}
+                            undoRedoCellEditingLimit={5}
+                            onSelectionChanged={onSelectionChanged}
+                        />
+                    </div>
+                </CardWrapper>
             </ContainerWrapper>
         </AuthenticatedLayout>
     )
