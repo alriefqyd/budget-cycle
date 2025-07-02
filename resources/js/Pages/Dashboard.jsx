@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
+import {Head, usePage} from '@inertiajs/react';
 import StatCard from "@/Components/StatCard.jsx";
 import CardWrapper from "@/Components/CardWrapper.jsx";
 import ContainerWrapper from "@/Components/ContainerWrapper.jsx";
@@ -7,16 +7,10 @@ import { AgCharts } from 'ag-charts-react';
 import { useState } from "react";
 
 export default function Dashboard() {
+    const { dataChart } = usePage().props
+    console.log(dataChart)
     const [chartOptions, setChartOptions] = useState({
-        data: [
-            { year: '5YP', approved: 770, plan: 910 },
-            { year: '2024', approved: 143, plan: null },
-            { year: '2025', approved: 177, plan: 198 },
-            { year: '2026', approved: 187, plan: 216 },
-            { year: '2027', approved: 164, plan: 222 },
-            { year: '2028', approved: 100, plan: 171 },
-            { year: '2029', approved: null, plan: 104 },
-        ],
+        data : dataChart,
         padding: {
             top: 50, // increase this for label space above bars
         },
@@ -60,7 +54,7 @@ export default function Dashboard() {
         ],
         axes: [
             { type: 'category', position: 'bottom', title: { text: 'Year' } },
-            { type: 'number', position: 'left', title: { text: 'Investment' } },
+            { type: 'number', position: 'left', title: { text: 'Investment (x000 USD)' } },
         ],
         legend: { position: 'bottom' },
     });
