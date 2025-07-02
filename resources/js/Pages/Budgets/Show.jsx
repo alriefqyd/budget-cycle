@@ -46,6 +46,7 @@ export default function Show() {
     const gridRef = useRef();
     const { projects, year, budgets } = usePage().props
     const [activeTab, setActiveTab] = useState('Tab1');
+    const [selectedRow, setSelectedRow] = useState(null);
 
     const pathParts = window.location.pathname.split('/');
     const startYear = parseInt(pathParts[pathParts.length - 1]) || new Date().getFullYear();
@@ -107,7 +108,7 @@ export default function Show() {
 
     const columnDefs = [
         { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:true},
-        { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true, // ✅ Show checkbox per row
+        { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true,
             headerCheckboxSelection: true},
         { headerName: "Project's Title", field: "project_title",pinned:'left', width: 300},
         { headerName: "Note", field: "note", filter: 'agTextColumnFilter' },
@@ -373,10 +374,64 @@ export default function Show() {
         agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
     };
 
+    const handleDuplicateRow = async () => {
+        const duplicatedRows = selectedRowsState.map(row => ({
+            ...row,
+            sap_code: 'COPY_' + (row['sap_code'] ? row['sap_code'] : 'XXXXX'),
+            year: startYear,
+        }));
+
+        if(duplicatedRows.length < 1) {
+            return false;
+        }
+
+        setRowData(prev => [...prev, ...duplicatedRows]);
+
+        const response = await fetch('/budgets/duplicate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(duplicatedRows)
+        })
+
+        const result = await response.json();
+        if (!response.ok) {
+            console.error("Failed to duplicate budget record:", result);
+            alert("An error occurred while duplicate the data. Please try again.");
+        }
+
+        agGridRef.current.api.applyTransaction({ update: [duplicatedRows] });
+
+        console.log(result.message);
+    };
+
+    const [selectedRowsState, setSelectedRowsState] = useState([]);
+
+
+    const onSelectionChanged = () => {
+        const api = agGridRef.current.api;
+        const currentlySelected = api.getSelectedRows();
+
+        setSelectedRowsState((prevSelected) => {
+            const currentlySelectedIds = currentlySelected.map(row => row.id);
+
+            const updated = prevSelected.filter(row => currentlySelectedIds.includes(row.id));
+
+            currentlySelected.forEach(row => {
+                if (!updated.find(r => r.id === row.id)) {
+                    updated.push(row);
+                }
+            });
+
+            return updated;
+        });
+    };
 
     const onCellValueChanged = async (params) => {
         const { data, colDef, api, node } = params;
-
 
         const budgetDistributeMonthly = (budgetPerYear, year) => {
             let budgetPerMonth = 0;
@@ -454,7 +509,6 @@ export default function Show() {
             for (let i = 0; i < 12; i++) {
                 const costMonth = i;
                 const cashMonthIndex = i + (data['top'] ? parseInt(data['top'])  : 0);
-                console.log(cashMonthIndex)
                 budgetYear += data[`cost_${i}_${year}`];
                 if (cashMonthIndex <= 12) {
                     const cashMonth = cashMonthIndex;
@@ -483,7 +537,6 @@ export default function Show() {
             Object.keys(value).forEach((key) => {
                 const regex = new RegExp(`^${type}_(\\d{1,2})_${year}$`);
                 if (regex.test(key)) {
-                    console.log(value[key]);
                     total += parseFloat(value[key] || 0);
                 }
             });
@@ -558,7 +611,7 @@ export default function Show() {
 
         try {
             const isNew = !data.id; // if no ID, it's new
-            data['period_year'] = startYear
+            data['year_period'] = startYear
 
             const response = await fetch(isNew ? '/budgets' : `/budgets/${data.id}`, {
                 method: isNew ? 'POST' : 'PUT',
@@ -581,7 +634,7 @@ export default function Show() {
                 agGridRef.current.api.applyTransaction({ update: [data] });
             }
 
-            console.log(result.message, result.data);
+            console.log(result.message);
         } catch (error) {
             console.error("Update error:", error);
         }
@@ -643,7 +696,14 @@ export default function Show() {
                         onClick={handleAddNewRow}
                         className="px-4 py-2 ml-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-700"
                     >
-                         + Add New Row
+                        + Add New Row
+                    </button>
+                </div>
+                <div className="flex float-end">
+                    <button onClick={handleDuplicateRow}
+                            className="px-4 py-2 ml-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-700"
+                    >
+                        Duplicate
                     </button>
                 </div>
                 <CardWrapper mb="mb-3">
@@ -681,6 +741,7 @@ export default function Show() {
                                 suppressRowClickSelection={true}
                                 undoRedoCellEditing={5}
                                 undoRedoCellEditingLimit={5}
+                                onSelectionChanged={onSelectionChanged}
                             />
                         </div>
                     </CardWrapper>

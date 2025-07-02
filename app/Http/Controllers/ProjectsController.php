@@ -9,6 +9,7 @@ use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
+use App\Services\ProjectsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -96,28 +97,52 @@ class ProjectsController extends Controller
 
     public function store(Request $request)
     {
-        $data = Projects::create([
-            'sap_code' => $request->sap_code,
-            'project_title' => $request->project_title,
-            'note' => $request->note,
-            'status_progress' => $request->status_progress,
-            'project_manager' => $request->project_manager,
-            'project_control' => $request->project_control,
-            'directorate' => $request->directorate,
-            'owner_area' => $request->owner_area,
-            'type_of_investment' => $request->type_of_investment,
-            'category' => $request->category,
-            'risk'=> $request->risk,
-            'fm_new' => $request->fm_new,
-            'year_period' => $request->period_year,
-            'start_year' => $request->year
-        ]);
+        try {
+            DB::beginTransaction();
+            $projectService = new ProjectsService();
+            $data = $projectService->saveProject($request);
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Budget create successfully',
+                'data' => $data //dont change this
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Budget create successfully',
-            'data' => $data
-        ]);
+    }
+
+    public function duplicate(Request $request){
+        DB::beginTransaction();
+        try {
+            $projectService = new ProjectsService();
+            foreach ($request->all() as $budget) {
+                $data = (object) $budget;
+                $project = $projectService->saveProject($data);
+                $budgetSetting = $projectService->saveBudget($project, $data);
+                $cashCostYearly = $projectService->saveCashCostYearly($project, $data);
+
+            }
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Budget duplicate successfully',
+                'data' => true
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'data' => false
+            ]);
+        }
+
     }
 
     public function upload(Request $request){
@@ -142,74 +167,85 @@ class ProjectsController extends Controller
 
     public function update(Request $request, $id)
     {
-        $project = Projects::with(['budgets','cashCostYearlies'])->findOrFail($id);
-        $project->update($request->all());
-        $budget = $project->budgets;
-        if($budget){
-            $budget->update($request->all());
-        } else {
-            $project->budgets()->create([
-                'budget_cost' => $request->budget_cost,
-                'actual_to_date' => $request->actual_to_date,
-                'budget_5yp' => $request->budget_5yp,
-                'start_year' => $request->start_year,
-                'num_of_year_budget' => $request->num_of_year_budget,
-                'total_cash' => $request->total_cash,
-                'total_cost' => $request->total_cost,
-                'cost_remaining' => $request->cost_remaining,
-                'budget_car' => $request->budget_car,
-                'project_id' => $request->id,
-                'cash_remaining' => $request->cash_remaining,
+        try {
+            DB::beginTransaction();
+            $project = Projects::with(['budgets','cashCostYearlies'])->findOrFail($id);
+            $project->update($request->all());
+            $budget = $project->budgets;
+            if($budget){
+                $budget->update($request->all());
+            } else {
+                $project->budgets()->create([
+                    'budget_cost' => $request->budget_cost,
+                    'actual_to_date' => $request->actual_to_date,
+                    'budget_5yp' => $request->budget_5yp,
+                    'start_year' => $request->start_year,
+                    'num_of_year_budget' => $request->num_of_year_budget,
+                    'total_cash' => $request->total_cash,
+                    'total_cost' => $request->total_cost,
+                    'cost_remaining' => $request->cost_remaining,
+                    'budget_car' => $request->budget_car,
+                    'project_id' => $request->id,
+                    'cash_remaining' => $request->cash_remaining,
+                ]);
+            }
+
+            foreach ($request->all() as $key => $value) {
+                if (preg_match('/^(cash|cost)_(\d{4})$/', $key, $matches)) {
+                    $type = $matches[1]; // 'cash' or 'cost'
+                    $year = $matches[2]; // e.g. '2025'
+
+                    $costCashYearly = CashCostYearly::where('year', $year)->where('type', $type)->where('project_id', $request->id)->first();
+                    // Save to DB, for example:
+                    if($costCashYearly){
+                        $costCashYearly->amount = $value;
+                        $costCashYearly->save();
+                    } else {
+                        CashCostYearly::create([
+                            'project_id' => $request->id,
+                            'type' => $type,
+                            'year' => $year,
+                            'amount' => $value,
+                        ]);
+                    }
+                }
+
+                if (preg_match('/^(cash|cost)_(1[0-2]|[1-9])_(\d{4})$/', $key, $match)) {
+                    $type = $match[1]; // 'cash' or 'cost'
+                    $month = $match[2];
+                    $year = $match[3]; // e.g. '2025'
+
+                    $yearlyId = CashCostYearly::where('year',$year)->where('type',$type)->where('project_id',$request->id)->first();
+                    $costCashMonthly = CashCostMonthly::where('yearly_id', $yearlyId->id)->where('month', $month)->where('type', $type)->get();
+                    if(sizeof($costCashMonthly) > 0){
+                        foreach ($costCashMonthly as $data) {
+                            $data->amount = $value;
+                            $data->save();
+                        }
+                    } else {
+                        CashCostMonthly::create([
+                            'yearly_id' => $yearlyId->id,
+                            'month' => $month,
+                            'amount' => $value,
+                            'type' => $type,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Budget updated successfully',
+                'data' => true
+            ]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'data' => false
             ]);
         }
-
-        foreach ($request->all() as $key => $value) {
-            if (preg_match('/^(cash|cost)_(\d{4})$/', $key, $matches)) {
-                $type = $matches[1]; // 'cash' or 'cost'
-                $year = $matches[2]; // e.g. '2025'
-
-                $costCashYearly = CashCostYearly::where('year', $year)->where('type', $type)->where('project_id', $request->id)->first();
-                // Save to DB, for example:
-                if($costCashYearly){
-                    $costCashYearly->amount = $value;
-                    $costCashYearly->save();
-                } else {
-                    CashCostYearly::create([
-                        'project_id' => $request->id,
-                        'type' => $type,
-                        'year' => $year,
-                        'amount' => $value,
-                    ]);
-                }
-            }
-
-            if (preg_match('/^(cash|cost)_(1[0-2]|[1-9])_(\d{4})$/', $key, $match)) {
-                $type = $match[1]; // 'cash' or 'cost'
-                $month = $match[2];
-                $year = $match[3]; // e.g. '2025'
-
-                $yearlyId = CashCostYearly::where('year',$year)->where('type',$type)->where('project_id',$request->id)->first();
-                $costCashMonthly = CashCostMonthly::where('yearly_id', $yearlyId->id)->where('month', $month)->where('type', $type)->get();
-                if(sizeof($costCashMonthly) > 0){
-                    foreach ($costCashMonthly as $data) {
-                        $data->amount = $value;
-                        $data->save();
-                    }
-                } else {
-                    CashCostMonthly::create([
-                        'yearly_id' => $yearlyId->id,
-                        'month' => $month,
-                        'amount' => $value,
-                        'type' => $type,
-                    ]);
-                }
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Budget updated successfully',
-            'data' => $request->all()
-        ]);
     }
 }
