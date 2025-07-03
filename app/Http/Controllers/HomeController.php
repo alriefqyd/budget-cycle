@@ -31,7 +31,7 @@ class HomeController extends Controller
 
         $cost5yp = Projects::with('budgets')->where('year_period', $startYear - 1)->get()
             ->reduce(function ($i, $item) {
-                return $i + $item->budgets->total_cost ?? 0;
+                return $i + $item->budgets?->total_cost ?? 0;
             });
 
         $cash5yp = $cash5yp ? round($cash5yp / 1000000, 2) : 0;
