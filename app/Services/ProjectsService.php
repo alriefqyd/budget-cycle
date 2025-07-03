@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\HomeController;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
@@ -71,6 +72,13 @@ class ProjectsService
                 ]);
             }
         }
+    }
+
+    public function updateChart(){
+        $homeController = new HomeController();
+        $year = date('Y');
+        $dataChart = $homeController->getCashCostYearly($year);
+        broadcast(new \App\Events\DashboardUpdated($dataChart->toArray()));
     }
 
 }

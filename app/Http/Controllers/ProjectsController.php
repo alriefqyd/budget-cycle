@@ -102,6 +102,7 @@ class ProjectsController extends Controller
             $projectService = new ProjectsService();
             $data = $projectService->saveProject($request);
             DB::commit();
+            $projectService->updateChart();
             return response()->json([
                 'success' => true,
                 'message' => 'Budget create successfully',
@@ -129,6 +130,7 @@ class ProjectsController extends Controller
 
             }
             DB::commit();
+            $projectService->updateChart();
             return response()->json([
                 'success' => true,
                 'message' => 'Budget duplicate successfully',
@@ -172,6 +174,7 @@ class ProjectsController extends Controller
             $project = Projects::with(['budgets','cashCostYearlies'])->findOrFail($id);
             $project->update($request->all());
             $budget = $project->budgets;
+            $projectService = new ProjectsService();
             if($budget){
                 $budget->update($request->all());
             } else {
@@ -234,6 +237,7 @@ class ProjectsController extends Controller
             }
 
             DB::commit();
+            $projectService->updateChart();
             return response()->json([
                 'success' => true,
                 'message' => 'Budget updated successfully',

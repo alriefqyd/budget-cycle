@@ -4,11 +4,10 @@ import StatCard from "@/Components/StatCard.jsx";
 import CardWrapper from "@/Components/CardWrapper.jsx";
 import ContainerWrapper from "@/Components/ContainerWrapper.jsx";
 import { AgCharts } from 'ag-charts-react';
-import { useState } from "react";
+import {useEffect, useState} from "react";
 
 export default function Dashboard() {
     const { dataChart } = usePage().props
-    console.log(dataChart)
     const [chartOptions, setChartOptions] = useState({
         data : dataChart,
         padding: {
@@ -51,13 +50,52 @@ export default function Dashboard() {
                     formatter: ({ value }) => `${value ?? ''}`,
                 },
             },
+
         ],
+        animation: {
+            enabled: true,
+            duration: 500, // ms
+        },
         axes: [
             { type: 'category', position: 'bottom', title: { text: 'Year' } },
             { type: 'number', position: 'left', title: { text: 'Investment (x000 USD)' } },
         ],
         legend: { position: 'bottom' },
     });
+
+    // this will update data chart if broadcast exist
+    useEffect(() => {
+        const channel = window.Echo.channel('dashboard')
+            .listen('.dashboard.update', (event) => {
+                const newData = event.data;
+
+                // 🔍 Compare with old data
+                const deltas = newData.map((newItem, index) => {
+                    const oldItem = chartOptions.data[index] || {};
+                    return {
+                        year: newItem.year,
+                        approvedDelta: newItem.approved * 1000000 - (oldItem.approved * 1000000 || 0),
+                        planDelta: newItem.plan * 100000 - (oldItem.plan * 1000000 || 0),
+                    };
+                });
+
+                // console.log('🔼 Changes:', deltas);
+
+                // 🟢 Optionally show toast/indicator here
+                deltas.forEach(d => {
+                    if (d.approvedDelta !== 0 || d.planDelta !== 0) {
+                        // console.log(d);
+                        // console.log(`Year ${d.year}: Approved +${d.approvedDelta}, Plan +${d.planDelta}`);
+                    }
+                });
+
+                // 🎯 Update chart data
+                setChartOptions(prev => ({
+                    ...prev,
+                    data: newData,
+                }));
+            });
+    }, []);
 
 
     return (

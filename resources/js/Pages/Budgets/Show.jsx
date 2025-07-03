@@ -132,7 +132,7 @@ export default function Show() {
         { headerName: "Start Year", field: "start_year", filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
-                    values.push(year.toString()); // Must be strings
+                    values.push(year); // Must be strings
                 }
                 return { values };
             } },
