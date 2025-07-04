@@ -79,6 +79,7 @@ export default function Dashboard() {
                     };
                 });
 
+                console.log(newData)
                 // console.log('🔼 Changes:', deltas);
 
                 // 🟢 Optionally show toast/indicator here
