@@ -14,10 +14,14 @@ export default function Dashboard() {
     const { projects } = usePage().props;
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
+    const [shouldReload, setShouldReload] = useState(false);
 
     useEffect(() => {
-        router.reload({ only: ['projects'] });
-    },[projects])
+        if(shouldReload) {
+            router.reload({ only: ['projects'] });
+            setShouldReload(false);
+        }
+    },[shouldReload])
     const handleUpload = async (data) => {
         setLoading(true);  // start loading
         const formData = new FormData();
@@ -51,6 +55,7 @@ export default function Dashboard() {
         } finally {
             setShowModal(false);
             setLoading(false);
+            setShouldReload(true);
         }
     };
 

@@ -19,11 +19,13 @@ class DashboardUpdated implements ShouldBroadcast
 
     public function __construct(array $data)
     {
+        Log::info("DashboardUpdated");
         $this->data = $data;
     }
 
     public function broadcastOn(): array
     {
+        Log::info('📡 Broadcasting on channel: dashboard');
         return [new Channel('dashboard')];
     }
 

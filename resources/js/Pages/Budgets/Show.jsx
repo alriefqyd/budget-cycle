@@ -726,7 +726,7 @@ export default function Show() {
                                 setActiveTab('Tab2');
                             }}
                         >
-                            Budget Yearly
+                            Budget Year To Date
                         </button>
                     </div>
                 </CardWrapper>
