@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\BudgetUpdated;
 use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
@@ -31,64 +32,8 @@ class ProjectsController extends Controller
 
     public function show($year)
     {
-        $budgets = Projects::with(['budgets','cashCostYearlies'])
-            ->where('year_period', $year)
-            ->get()
-            ->map(function ($project) {
-                $item = [
-                    'id' => $project->id,
-                    'project_title' => $project->project_title,
-                    'year_period' => $project->year_period,
-                    'status_progress' => $project->status_progress,
-                    'note' => $project->note,
-                    'sap_code' => $project->sap_code,
-                    'project_manager' => $project->project_manager,
-                    'project_control' => $project->project_control,
-                    'directorate' => $project->directorate,
-                    'owner_area' => $project->owner_area,
-                    'type_of_investment' => $project->type_of_investment,
-                    'category'=>$project->category,
-                    'risk'=>$project->risk,
-                    'fm_new'=>$project->fm_new,
-                    'budget_5yp'=>$project->budgets?->budget_5yp,
-                    'budget_car'=>$project->budgets?->budget_car,
-                    'actual_to_date'=>$project->budgets?->actual_to_date,
-                    'start_year'=>$project->budgets?->start_year,
-                    'num_of_year_budget'=>$project->budgets?->num_of_year_budget,
-                    'total_cash' => $project->budgets?->total_cash,
-                    'total_cost' => $project->budgets?->total_cost,
-                    'cash_remaining' => $project->budgets?->cash_remaining,
-                    'cost_remaining' => $project->budgets?->cost_remaining,
-                ];
-
-
-
-                // Add dynamic cash_YYYY and cost_YYYY fields
-                if ($project->cashCostYearlies && $project->cashCostYearlies->count()) {
-                    foreach ($project->cashCostYearlies as $budget) {
-                        if (!empty($budget->type) && !empty($budget->year)) {
-                            $fieldName = "{$budget->type}_{$budget->year}";
-                            $item[$fieldName] = $budget->amount;
-                        }
-
-                        if(sizeof($budget?->cashCostMonthly) > 0){
-                            foreach ($budget?->cashCostMonthly as $monthly) {
-                                if (!empty($budget->type) && !empty($monthly->month)) {
-                                    $fieldName = "{$budget->type}_{$monthly->month}_{$budget->year}";
-                                    $item[$fieldName] = $monthly->amount;
-                                }
-                            }
-                            $totalYear = $budget->cashCostMonthly->sum('amount');
-                            $item['total_'.$budget->type.'_'.$budget->year] = $totalYear;
-                            $item[$budget->type.'_'.$budget->year.'_remaining'] = $budget->amount - $totalYear;
-                        }
-                    }
-                }
-
-                return $item;
-            })
-            ->toArray(); // <- convert from Collection to plain array
-
+        $projectService = new ProjectsService;
+        $budgets = $projectService->getBudgetsByYear($year, null);
         return Inertia::render('Budgets/Show', [
             'year' => $year,
             'budgets' => $budgets,
@@ -103,6 +48,7 @@ class ProjectsController extends Controller
             $data = $projectService->saveProject($request);
             DB::commit();
             $projectService->updateChart();
+            $projectService->updateBudgets($request->year_period, $data->id);
             return response()->json([
                 'success' => true,
                 'message' => 'Budget create successfully',
@@ -122,19 +68,21 @@ class ProjectsController extends Controller
         DB::beginTransaction();
         try {
             $projectService = new ProjectsService();
+            $projectList = collect();
             foreach ($request->all() as $budget) {
                 $data = (object) $budget;
                 $project = $projectService->saveProject($data);
+                $projectList->push($project);
                 $budgetSetting = $projectService->saveBudget($project, $data);
                 $cashCostYearly = $projectService->saveCashCostYearly($project, $data);
-
+                broadcast(new BudgetUpdated($project->toArray()));
             }
             DB::commit();
             $projectService->updateChart();
             return response()->json([
                 'success' => true,
                 'message' => 'Budget duplicate successfully',
-                'data' => true
+                'data' => $projectList
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -238,6 +186,7 @@ class ProjectsController extends Controller
 
             DB::commit();
             $projectService->updateChart();
+            $projectService->updateBudgets($request->year_period, $id);
             return response()->json([
                 'success' => true,
                 'message' => 'Budget updated successfully',

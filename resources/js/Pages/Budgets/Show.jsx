@@ -22,7 +22,8 @@ import {
     CellStyleModule,
     RowSelectionModule,
     HighlightChangesModule,
-    UndoRedoEditModule
+    UndoRedoEditModule,
+    RowApiModule
 } from 'ag-grid-community';
 
 
@@ -39,11 +40,13 @@ ModuleRegistry.registerModules([
     CellStyleModule,
     RowSelectionModule,
     HighlightChangesModule,
-    UndoRedoEditModule
+    UndoRedoEditModule,
+    RowApiModule
 ]);
 
 export default function Show() {
     const gridRef = useRef();
+    const lastUpdatedId = useRef(null);
     const { projects, year, budgets } = usePage().props
     const [activeTab, setActiveTab] = useState('Tab1');
     const [selectedRow, setSelectedRow] = useState(null);
@@ -53,11 +56,79 @@ export default function Show() {
     const endYear = startYear + 4;
     const yearlyBudget = startYear + 2;
     const month = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const [selectedRowsState, setSelectedRowsState] = useState([]);
+
+    // useEffect(() => {
+    //     // const channel = window.Echo.channel('budgets')
+    //     //     .listen('.budgets.update', (event) => {
+    //     //        setRowData(event.data);
+    //     //     });
+    //
+    //     // this is websocket handshake (subscribtion) running once component rendered
+    //     const channel = window.Echo.channel('budgets')
+    //         .listen('.budgets.update', (event) => {
+    //             const updatedRow = event.data; // should be a plain object
+    //             const agGridApi = agGridRef.current.api;
+    //             const rowNode = agGridApi.getRowNode(String(updatedRow.id));
+    //             if(!rowNode){
+    //                 setRowData(prev => ({
+    //                     ...prev,
+    //                     data: updatedRow
+    //                 }));
+    //
+    //                 agGridRef.current.api.applyTransaction({ add: [updatedRow], addIndex: 0 });
+    //             } else {
+    //                 rowNode.setData(updatedRow);
+    //                 agGridApi.flashCells({ rowNodes: [rowNode], columns: Object.keys(updatedRow) });
+    //             }
+    //         });
+    // }, []);
+
+    useEffect(() => {
+        const channel = window.Echo.channel('budgets')
+            .listen('.budgets.update', (event) => {
+                const updatedRow = event.data;
+                const agGridApi = agGridRef.current.api;
+                if (!agGridApi || !updatedRow?.id) return;
+
+                if (updatedRow.id === lastUpdatedId.current) {
+                    lastUpdatedId.current = null; // clear it
+                    return;
+                }
+
+                const rowNode = agGridApi.getRowNode(String(updatedRow.id));
+
+                if (!rowNode) {
+                    setRowData(prev => ({
+                        ...prev,
+                        data: updatedRow
+                    }));
+                    agGridApi.applyTransaction({ add: [updatedRow], addIndex: 0 });
+                } else {
+                    rowNode.setData(updatedRow);
+                    agGridApi.flashCells({
+                        rowNodes: [rowNode],
+                        columns: Object.keys(updatedRow),
+                    });
+                }
+            });
+
+        return () => {
+            channel.stopListening('.budgets.update');
+        };
+    }, []);
+
+    // const [rowData, setRowData] = useState([]);
+    const [rowData, setRowData] = useState([]);
+    useEffect(() => {
+        setRowData(budgets);
+    }, [budgets]);
 
     const toSentenceCase = (str) => {
         if (!str) return "";
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     };
+
     const generateTwoYearYearly = (year,type) => {
         month.forEach((month,index) => {
             let color = 'custom-header-blue'
@@ -107,7 +178,7 @@ export default function Show() {
 
 
     const columnDefs = [
-        { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:true},
+        { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:false},
         { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true,
             headerCheckboxSelection: true},
         { headerName: "Project's Title", field: "project_title",pinned:'left', width: 300},
@@ -125,18 +196,18 @@ export default function Show() {
         { headerName: "Category", field: "category", filter: 'agTextColumnFilter', agTextColumnFilter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
             values: ['English', 'Spanish', 'French', 'Portuguese'],
             } },
-        { headerName: "Risk", field: "risk", filter: 'agTextColumnFilter', minWidth: 50 },
-        { headerName: "Budget Car", field: "budget_car", filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Actual to Date", field: "actual_to_date", filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Budget 5YP", field: "budget_5yp", filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-        { headerName: "Start Year", field: "start_year", filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
+        { headerName: "Risk", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "Budget Car", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Actual to Date", field: "actual_to_date",enableCellChangeFlash: false, filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Budget 5YP", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+        { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
-                    values.push(year); // Must be strings
+                    values.push(year.toString()); // Must be strings
                 }
                 return { values };
             } },
-        { headerName: "Budget Year", field: "num_of_year_budget", filter: 'agTextColumnFilter', minWidth: 150, cellEditor: "agSelectCellEditor",
+        { headerName: "Budget Year", field: "num_of_year_budget", filter: 'agTextColumnFilter', enableCellChangeFlash: false, minWidth: 150, cellEditor: "agSelectCellEditor",
             cellEditorParams: (params) => {
                 const values = [];
                 const start = parseInt(params.data?.start_year) || new Date().getFullYear();
@@ -151,8 +222,8 @@ export default function Show() {
                 return { values };
             }
         },
-        { headerName: "FM New", field: "fm_new", filter: 'agTextColumnFilter' },
-        { headerName: "Top",  field: "top", filter: 'agTextColumnFilter', minWidth:90, hide: activeTab === 'Tab1' ? true : false, cellEditor: "agSelectCellEditor", enableCellChangeFlash: true,
+        { headerName: "FM New", field: "fm_new", enableCellChangeFlash: false, filter: 'agTextColumnFilter' },
+        { headerName: "Top",  field: "top",  filter: 'agTextColumnFilter', minWidth:90, hide: activeTab === 'Tab1' ? true : false, cellEditor: "agSelectCellEditor", enableCellChangeFlash: false,
             cellEditorParams: (params) => {
                 const values = [];
                 for (let num = 1; num < 12; num++) {
@@ -176,6 +247,7 @@ export default function Show() {
                     minWidth: 170,
                     headerClass: 'custom-header-red',
                     editable:false,
+                    enableCellChangeFlash: false,
                     hide: activeTab === 'Tab1'  ? true : false,
                     valueFormatter: params => formatCurrency(params.value),
                 }
@@ -190,6 +262,7 @@ export default function Show() {
             filter: 'agNumberColumnFilter',
             minWidth: 150,
             hide: hide,
+            enableCellChangeFlash: false,
             headerClass:'custom-header-orange',
             valueFormatter: params => formatCurrency(params.value)
         }
@@ -204,6 +277,7 @@ export default function Show() {
                     minWidth: 220,
                     hide: activeTab === 'Tab1'  ? true : false,
                     headerClass:'custom-header-green-2',
+                    enableCellChangeFlash: false,
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
                         'positive-value': params => params.value >= 0
@@ -219,6 +293,7 @@ export default function Show() {
             filter: 'agTextColumnFilter',
             minWidth: 150,
             editable:false,
+            enableCellChangeFlash: false,
             headerClass:'custom-header-orange',
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value)
@@ -230,6 +305,7 @@ export default function Show() {
             minWidth: 150,
             editable: false,
             headerClass:'custom-header-orange',
+            enableCellChangeFlash: false,
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value),
             cellClassRules: {
@@ -249,6 +325,7 @@ export default function Show() {
                     minWidth: 170,
                     headerClass: 'custom-header-red',
                     editable:false,
+                    enableCellChangeFlash: false,
                     hide: activeTab === 'Tab1'  ? true : false,
                     valueFormatter: params => formatCurrency(params.value),
                 }
@@ -260,6 +337,7 @@ export default function Show() {
             field: `cash_${year}`,
             filter: 'agNumberColumnFilter',
             minWidth: 150,
+            enableCellChangeFlash: false,
             headerClass:'custom-header-green',
             valueFormatter: params => formatCurrency(params.value),
             hide: hide,
@@ -272,6 +350,7 @@ export default function Show() {
                     field: `cash_${year}_remaining`,
                     filter: 'agNumberColumnFilter',
                     minWidth: 220,
+                    enableCellChangeFlash: false,
                     hide: activeTab === 'Tab1' ? true : false,
                     headerClass:'custom-header-green',
                     cellClassRules: {
@@ -290,6 +369,7 @@ export default function Show() {
             filter: 'agTextColumnFilter',
             minWidth: 150,
             editable:false,
+            enableCellChangeFlash: false,
             headerClass:'custom-header-green',
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value)
@@ -300,6 +380,7 @@ export default function Show() {
             filter: 'agTextColumnFilter',
             minWidth: 150,
             editable:false,
+            enableCellChangeFlash: false,
             headerClass:'custom-header-green',
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value),
@@ -309,12 +390,6 @@ export default function Show() {
             }
         }
     )
-
-    // const [rowData, setRowData] = useState([]);
-    const [rowData, setRowData] = useState([]);
-    useEffect(() => {
-        setRowData(budgets);
-    }, [budgets]);
 
     const defaultColDef = {
         resizable: true,
@@ -371,6 +446,11 @@ export default function Show() {
             }
         }
 
+        setRowData(prev => ({
+            ...prev,
+            data: newRow
+        }));
+
         agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
     };
 
@@ -384,8 +464,6 @@ export default function Show() {
         if(duplicatedRows.length < 1) {
             return false;
         }
-
-        setRowData(prev => [...prev, ...duplicatedRows]);
 
         const response = await fetch('/budgets/duplicate', {
             method: 'POST',
@@ -402,15 +480,10 @@ export default function Show() {
             console.error("Failed to duplicate budget record:", result);
             alert("An error occurred while duplicate the data. Please try again.");
         }
-
-        agGridRef.current.api.applyTransaction({ update: [duplicatedRows] });
-
-        console.log(result.message);
+        setRowData(prev => [...prev, ...result.data]);
+        agGridRef.current.api.applyTransaction({ add: result.data, addIndex: 0 });
+        console.log(result);
     };
-
-    const [selectedRowsState, setSelectedRowsState] = useState([]);
-
-
     const onSelectionChanged = () => {
         const api = agGridRef.current.api;
         const currentlySelected = api.getSelectedRows();
@@ -612,7 +685,6 @@ export default function Show() {
         try {
             const isNew = !data.id; // if no ID, it's new
             data['year_period'] = startYear
-
             const response = await fetch(isNew ? '/budgets' : `/budgets/${data.id}`, {
                 method: isNew ? 'POST' : 'PUT',
                 headers: {
@@ -629,9 +701,34 @@ export default function Show() {
                 alert("An error occurred while updating the data. Please try again.");
             }
 
+            // if (isNew && result.data?.id) {
+            //     data.id = result.data.id;
+            //     lastUpdatedId.current = data.id;
+            //     agGridRef.current.api.applyTransaction({ update: [data] });
+            // }
+
+            // if (isNew && result.data?.id) {
+            //     // Remove the old row with `id: null`
+            //     agGridRef.current.api.applyTransaction({ remove: [params.data] });
+            //
+            //     // Assign new ID and re-add it
+            //     const newRow = {
+            //         ...data,
+            //         id: result.data.id
+            //     };
+            //
+            //     lastUpdatedId.current = newRow.id;
+            //
+            //     agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
+            // }
+
             if (isNew && result.data?.id) {
-                data.id = result.data.id;
-                agGridRef.current.api.applyTransaction({ update: [data] });
+                agGridRef.current.api.applyTransaction({ remove: [params.data] });
+                const newRow = { ...data, id: result.data.id };
+                lastUpdatedId.current = newRow.id;
+                agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
+            } else {
+                lastUpdatedId.current = data.id;
             }
 
             console.log(result.message);
@@ -746,6 +843,7 @@ export default function Show() {
                             undoRedoCellEditing={5}
                             undoRedoCellEditingLimit={5}
                             onSelectionChanged={onSelectionChanged}
+                            getRowId={params => params.data.id}
                         />
                     </div>
                 </CardWrapper>

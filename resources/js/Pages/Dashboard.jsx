@@ -68,7 +68,6 @@ export default function Dashboard() {
         const channel = window.Echo.channel('dashboard')
             .listen('.dashboard.update', (event) => {
                 const newData = event.data;
-
                 // 🔍 Compare with old data
                 const deltas = newData.map((newItem, index) => {
                     const oldItem = chartOptions.data[index] || {};
