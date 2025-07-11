@@ -35,15 +35,15 @@ class ProjectsService
     public function saveBudget($project,$data){
         BudgetSetting::create([
             'project_id' => $project->id,
-            'actual_to_date' => $data?->actual_to_date,
-            'budget_5yp' => $data?->budget_5yp,
-            'start_year' => $data?->start_year,
-            'num_of_year_budget' => $data?->num_of_year_budget,
-            'total_cash' => $data?->total_cash,
-            'total_cost' => $data?->total_cost,
-            'budget_car' => $data?->budget_car,
-            'cash_remaining' => $data?->cash_remaining,
-            'cost_remaining' => $data?->cost_remaining,
+            'actual_to_date' => $data?->actual_to_date ?? null,
+            'budget_5yp' => $data?->budget_5yp ?? null,
+            'start_year' => $data?->start_year ?? null,
+            'num_of_year_budget' => $data?->num_of_year_budget ?? null,
+            'total_cash' => $data?->total_cash ?? null,
+            'total_cost' => $data?->total_cost ?? null,
+            'budget_car' => $data?->budget_car ?? null,
+            'cash_remaining' => $data?->cash_remaining ?? null,
+            'cost_remaining' => $data?->cost_remaining ?? null,
         ]);
     }
 

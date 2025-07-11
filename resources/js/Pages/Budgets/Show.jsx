@@ -480,7 +480,7 @@ export default function Show() {
             console.error("Failed to duplicate budget record:", result);
             alert("An error occurred while duplicate the data. Please try again.");
         }
-        setRowData(prev => [...prev, ...result.data]);
+
         agGridRef.current.api.applyTransaction({ add: result.data, addIndex: 0 });
         console.log(result);
     };

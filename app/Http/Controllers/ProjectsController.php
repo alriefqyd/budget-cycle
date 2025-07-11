@@ -59,6 +59,7 @@ class ProjectsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'data' => []
             ]);
         }
 
@@ -89,7 +90,7 @@ class ProjectsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'data' => false
+                'data' => []
             ]);
         }
 
