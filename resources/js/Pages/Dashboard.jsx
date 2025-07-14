@@ -122,10 +122,10 @@ export default function Dashboard() {
                     </div>
                 </div>
                 {/* Income and Loss Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/*<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <StatCard label={"Our Annual Income"} value={"8,50,49"} percentage={"▲ 95.54%"}></StatCard>
                     <StatCard label={"Our Annual Income"} value={"8,11,49"} percentage={"▲ 95.54%"}></StatCard>
-                </div>
+                </div>*/}
             </ContainerWrapper>
         </AuthenticatedLayout>
     );
