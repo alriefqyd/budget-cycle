@@ -36,7 +36,7 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         $this->year = $year;
     }
     public function batchSize(): int{
-        return 500;
+        return 1000;
     }
 
     public function chunkSize(): int{
@@ -166,7 +166,7 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
 
     public static function afterImport(AfterImport $event){
         Log::info('AfterImport event fired');
-        $importInstance = $event->getConcernable();
-        Projects::whereNotIn('sap_code', $importInstance->uniqueIdentifiers)->delete();
+//        $importInstance = $event->getConcernable();
+//        Projects::whereNotIn('sap_code', $importInstance->uniqueIdentifiers)->delete();
     }
 }
