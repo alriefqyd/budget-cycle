@@ -106,9 +106,6 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
 
         $uniqueValue = $row['sap_code'];
         $this->uniqueIdentifiers[] = $uniqueValue;
-        if(!isset($row['project_title'])){
-            return;
-        }
         $project = Projects::create([
             'sap_code' => $row['sap_code'],
             'project_title' => $row['project_title'],
