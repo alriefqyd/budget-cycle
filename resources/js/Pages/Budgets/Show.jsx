@@ -188,18 +188,23 @@ export default function Show() {
             } },
         { headerName: "PM", field: "project_manager", filter: 'agTextColumnFilter', minWidth: 220 },
         { headerName: "PC", field: "project_control", filter: 'agTextColumnFilter', minWidth: 150 },
-        { headerName: "Director", field: "directorate", filter: 'agTextColumnFilter', minWidth: 75 },
+        { headerName: "Directorate", field: "directorate", filter: 'agTextColumnFilter', minWidth: 75 },
         { headerName: "Owner Area", field: "owner_area", filter: 'agTextColumnFilter', minWidth: 200 },
         { headerName: "Type of Investment", field: "type_of_investment", filter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
-            values: ['English', 'Spanish', 'French', 'Portuguese'],
+            values: ['True Sustaining', 'One-off'],
             } },
         { headerName: "Category", field: "category", filter: 'agTextColumnFilter', agTextColumnFilter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
             values: ['English', 'Spanish', 'French', 'Portuguese'],
             } },
-        { headerName: "Risk", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "Risk Residual", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "Risk Forecast", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
         { headerName: "Budget Car", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Actual to Date", field: "actual_to_date",enableCellChangeFlash: false, filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Budget 5YP", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+        { headerName: "Actual to Date Cash", field: "actual_to_date",enableCellChangeFlash: false, filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Actual to Date Cost", field: "actual_to_date_cost",enableCellChangeFlash: false, filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Budget 5YP Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+        { headerName: "Budget 5YP Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+        { headerName: "Forecast Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+        { headerName: "Forecast Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
         { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {

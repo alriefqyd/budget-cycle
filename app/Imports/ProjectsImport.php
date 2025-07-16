@@ -67,21 +67,24 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             'year_period' => $this->year,
             'budget_car' => $row[12] ?? "",
             'actual_to_date' => $row[13] ?? "",
-            'budget_5yp' => $row[14] ?? "",
-            'start_year' => $row[15] ?? "",
-            'num_of_year_budget' => $row[16] ?? "",
-            'fm_new' => $row[17] ?? "",
-            'cash_first' => $row[18] ?? "",
-            'cash_second' => $row[19] ?? "",
-            'cash_third' => $row[20] ?? "",
-            'cash_fourth' => $row[21] ?? "",
-            'cash_fifth' => $row[22] ?? "",
-            'cost_first' => $row[24] ?? "",
-            'cost_second' => $row[25] ?? "",
-            'cost_third' => $row[26] ?? "",
-            'cost_fourth' => $row[27] ?? "",
-            'cost_fifth' => $row[28] ?? "",
-
+            'actual_to_date_cost' => $row[14] ?? "",
+            'forecast_cost' => $row[15] ?? "",
+            'forecast_cash' => $row[16] ?? "",
+            'budget_5yp' => $row[17] ?? "",
+            'budget_5yp_cost' => $row[18] ?? "",
+            'start_year' => $row[19] ?? "",
+            'num_of_year_budget' => $row[20] ?? "",
+            'fm_new' => $row[21] ?? "",
+            'cash_first' => $row[22] ?? "",
+            'cash_second' => $row[23] ?? "",
+            'cash_third' => $row[24] ?? "",
+            'cash_fourth' => $row[25] ?? "",
+            'cash_fifth' => $row[26] ?? "",
+            'cost_first' => $row[27] ?? "",
+            'cost_second' => $row[28] ?? "",
+            'cost_third' => $row[29] ?? "",
+            'cost_fourth' => $row[30] ?? "",
+            'cost_fifth' => $row[31] ?? "",
         ];
     }
 
@@ -105,6 +108,9 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         ];
 
         $uniqueValue = $row['sap_code'];
+        if(!isset($uniqueValue)){
+            return;
+        }
         $this->uniqueIdentifiers[] = $uniqueValue;
         $project = Projects::create([
             'sap_code' => $row['sap_code'],
@@ -155,7 +161,11 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         BudgetSetting::create([
             'budget_car' => is_numeric($row['budget_car']) ? $row['budget_car'] : null,
             'actual_to_date' => is_numeric($row['actual_to_date'] ?? null) ? $row['actual_to_date'] : null,
+            'actual_to_date_cost' => is_numeric($row['actual_to_date_cost'] ?? null) ? $row['actual_to_date'] : null,
             'budget_5yp' => is_numeric($row['budget_5yp'] ?? null) ? $row['budget_5yp'] : null,
+            'budget_5yp_cost' => is_numeric($row['budget_5yp_cost'] ?? null) ? $row['budget_5yp'] : null,
+            'forecast_cost' => is_numeric($row['forecast_cost'] ?? null) ? $row['forecast_cost'] : null,
+            'forecast_cash' => is_numeric($row['forecast_cash'] ?? null) ? $row['forecast_cash'] : null,
             'start_year' => is_numeric($row['start_year'] ?? null) ? $row['start_year'] : null,
             'num_of_year_budget' => $row['num_of_year_budget'] ?? null,
             'project_id' => $project->id,
