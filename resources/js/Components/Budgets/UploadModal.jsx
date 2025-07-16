@@ -1,7 +1,7 @@
 import {useRef} from "react";
 import {Spinner} from "@/Components/Spinner.jsx";
 
-export default function UploadModal({ show, onClose, onSubmit, loading }) {
+export default function UploadModal({ show, modalType , onClose, onSubmit, loading }) {
     const fileInput = useRef();
     const yearSelect = useRef();
 
@@ -12,40 +12,56 @@ export default function UploadModal({ show, onClose, onSubmit, loading }) {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
-                <h2 className="text-lg font-semibold mb-4 text-gray-800">Upload Excel File</h2>
+                <h2 className="text-lg font-semibold mb-4 text-gray-800">Create New Budget Cycle 5 Years</h2>
 
                 <form
                     encType="multipart/form-data"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        onSubmit({
-                            file: fileInput.current.files[0],
-                            year: yearSelect.current.value
-                        });
+
+                        let paramsSubmit = {
+                            year: yearSelect.current?.value || ''
+                        };
+
+                        if (modalType === 'excel') {
+                            const file = fileInput.current?.files?.[0] || null;
+                            paramsSubmit = {
+                                file,
+                                year: yearSelect.current?.value || ''
+                            };
+                        }
+
+                        onSubmit(paramsSubmit);
                     }}
                 >
-                    <label className="block mb-2 text-sm font-medium text-gray-700">Select Year</label>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">Select Start Year</label>
                     <select
                         name="year"
                         ref={yearSelect}
                         required
                         className="block w-full mb-4 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                     >
-                        <option value="">-- Choose Year --</option>
+                        <option value="">-- Choose Start Year --</option>
                         {years.map((year) => (
                             <option key={year} value={year}>{year}</option>
                         ))}
                     </select>
 
-                    <label className="block mb-2 text-sm font-medium text-gray-700">Excel File</label>
-                    <input
-                        type="file"
-                        accept=".xlsx, .xls"
-                        name="file"
-                        ref={fileInput}
-                        required
-                        className="block w-full mb-4 text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500 file:bg-teal-600 file:text-white file:px-4 file:py-2 file:rounded file:border-none file:cursor-pointer"
-                    />
+                    {modalType == 'excel' ? (
+                        <>
+                            <label className="block mb-2 text-sm font-medium text-gray-700">Excel File</label>
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls"
+                                name="file"
+                                ref={fileInput}
+                                required
+                                className="block w-full mb-4 text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500 file:bg-teal-600 file:text-white file:px-4 file:py-2 file:rounded file:border-none file:cursor-pointer"
+                            />
+                        </>
+                    ) : (
+                        <></>
+                    )}
 
                     <div className="flex justify-end space-x-2">
                         <button
@@ -65,9 +81,9 @@ export default function UploadModal({ show, onClose, onSubmit, loading }) {
                                     <Spinner/>
                                     <span className="ml-2">Uploading...</span>
                                 </>
-                            ) : (
-                                "Upload Excel"
-                            )}
+                            ) : modalType === 'excel' ? (
+                                'Upload Excel'
+                            ) : 'Create New Budget Cycle' }
                         </button>
                     </div>
                 </form>

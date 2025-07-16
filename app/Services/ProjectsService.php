@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\ApprovalStatus;
 use App\Events\BudgetUpdated;
 use App\Http\Controllers\HomeController;
+use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
@@ -11,7 +13,7 @@ use App\Models\Projects;
 
 class ProjectsService
 {
-    public function saveProject($request){
+    public function saveProject($request, $budgetCyclePeriod){
         $data = Projects::create([
             'project_title' => $request->project_title,
             'sap_code' => $request->sap_code,
@@ -26,7 +28,20 @@ class ProjectsService
             'risk'=> $request->risk,
             'fm_new' => $request->fm_new,
             'year_period' => $request->year_period,
-            'start_year' => $request->year
+            'start_year' => $request->year,
+            'budget_cycle_period_id' => $budgetCyclePeriod->id,
+        ]);
+
+        return $data;
+    }
+
+    public function saveBudgetCyclePeriod($request, $status){
+        $data = BudgetCyclePeriod::create([
+            'approval_status' => $status,
+            'start_year' => $request->year,
+            'end_year' => $request->year + 4,
+            'total_cost' => 0,
+            'total_cast' => 0
         ]);
 
         return $data;

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\ApprovalStatus;
 use App\Events\BudgetUpdated;
 use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
@@ -45,8 +46,11 @@ class ProjectsController extends Controller
         try {
             DB::beginTransaction();
             $projectService = new ProjectsService();
-            $data = $projectService->saveProject($request);
+            $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
+            $data = $projectService->saveProject($request, $budgetCycle);
+
             DB::commit();
+            /** Websocket */
             $projectService->updateChart();
             $projectService->updateBudgets($request->year_period, $data->id);
             return response()->json([
@@ -62,7 +66,6 @@ class ProjectsController extends Controller
                 'data' => []
             ]);
         }
-
     }
 
     public function duplicate(Request $request){
@@ -114,6 +117,26 @@ class ProjectsController extends Controller
 
         Log::info('No file uploaded');
         return response()->json(['message' => 'No file uploaded'], 400);
+    }
+
+    public function create(Request $request){
+        try {
+            $projectService = new ProjectsService;
+            $budgetCyclePeriod = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::ON_GOING);
+            $data = Projects::create([
+                'project_title' => 'Project Title',
+                'sap_code' => 'Sap Code',
+                'year_period' => $request->year,
+                'start_year' => $request->year,
+                'budget_cycle_id' => $budgetCyclePeriod->id,
+            ]);
+            return response()->json(['message' => 'Save Successful']);
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('Save error: ' . $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+        return response()->json(['message' => 'No Project Created'], 400);
     }
 
     public function update(Request $request, $id)

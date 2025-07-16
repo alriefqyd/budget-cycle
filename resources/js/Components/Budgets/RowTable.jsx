@@ -11,6 +11,8 @@ export default function RowTable(props) {
             <td className="px-4 py-3 text-center font-medium">{budget} - {parseInt(budget) + 4}</td>
             <td className="px-4 py-3 text-right font-semibold">$ {totalCash.toLocaleString()}</td>
             <td className="px-4 py-3 text-right font-semibold">$ {totalCost.toLocaleString()}</td>
+            <td className="px-4 py-3 text-right font-semibold">Approved / On Going</td>
+            <td className="px-4 py-3 text-right font-semibold">2</td>
             <td className="px-4 py-3 text-center">
                 <div
                     className="flex flex-wrap gap-1 justify-center text-xs text-gray-700 font-medium">

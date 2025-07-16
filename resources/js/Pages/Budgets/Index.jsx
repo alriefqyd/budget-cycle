@@ -12,6 +12,7 @@ import axios from "axios";
 
 export default function Dashboard() {
     const { projects } = usePage().props;
+    const [modalType, setModalType] = useState('excel')
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
     const [shouldReload, setShouldReload] = useState(false);
@@ -31,7 +32,7 @@ export default function Dashboard() {
         try {
             setLoading(true);
 
-            const response = await axios.post('/budgets/upload', formData, {
+            const response = await axios.post(data.file ? '/budgets/upload' : '/budgets/create', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
@@ -72,25 +73,38 @@ export default function Dashboard() {
             <ContainerWrapper>
                 <CardWrapper>
                     <div className="p-6 bg-white shadow-sm rounded-xl border border-gray-200">
-                        <div className="flex justify-between items-center mb-4">
+                        <div className="mb-4 flex justify-between">
                             <h2 className="text-xl font-semibold text-gray-900">
                                 Budget Overview
                             </h2>
-                            <button
-                                onClick={() => setShowModal(true)}
-                                className="px-4 py-2 bg-teal-600 text-white text-sm rounded hover:bg-teal-700 flex items-center justify-center"
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <>
-                                        <Spinner />
-                                        <span className="ml-2">Uploading...</span>
-                                    </>
-                                ) : (
-                                    "Upload Excel"
-                                )}
-                            </button>
-
+                            <div className="flex justify-end gap-1">
+                                <button
+                                    onClick={() => {
+                                        setShowModal(true);
+                                        setModalType('excel');
+                                    }}
+                                    className="px-4 py-2 bg-teal-600 text-white text-sm rounded hover:bg-teal-700 justify-center"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Spinner/>
+                                            <span className="ml-2">Uploading...</span>
+                                        </>
+                                    ) : (
+                                        "Upload Excel"
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowModal(true);
+                                        setModalType('form');
+                                    }}
+                                    className="px-4 py-2 bg-teal-600 text-white text-sm rounded hover:bg-teal-700 justify-center"
+                                    disabled={loading}>
+                                    Create New Budget Cycle
+                                </button>
+                            </div>
                         </div>
 
                         <div className="overflow-x-auto">
@@ -100,6 +114,8 @@ export default function Dashboard() {
                                     <th className="px-4 py-3 text-center">Year</th>
                                     <th className="px-4 py-3 text-right">Cash Total</th>
                                     <th className="px-4 py-3 text-right">Cost Total</th>
+                                    <th className="px-4 py-3 text-right">Status (Approved / On Going With Version)</th>
+                                    <th className="px-4 py-3 text-right">Version</th>
                                     <th className="px-4 py-3 text-center">
                                         Yearly Breakdown
                                     </th>
@@ -123,6 +139,7 @@ export default function Dashboard() {
 
             <UploadModal
                 show={showModal}
+                modalType={modalType}
                 onClose={() => {
                     if (!loading) setShowModal(false);
                 }}
