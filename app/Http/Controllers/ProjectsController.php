@@ -153,7 +153,11 @@ class ProjectsController extends Controller
                 $project->budgets()->create([
                     'budget_cost' => $request->budget_cost,
                     'actual_to_date' => $request->actual_to_date,
+                    'actual_to_date_cost' => $request->actual_to_date_cost,
                     'budget_5yp' => $request->budget_5yp,
+                    'budget_5yp_cash' => $request->budget_5yp_cash,
+                    'forecast_cost' => $request->forecast_cost,
+                    'forecast_cash' => $request->forecast_cash,
                     'start_year' => $request->start_year,
                     'num_of_year_budget' => $request->num_of_year_budget,
                     'total_cash' => $request->total_cash,

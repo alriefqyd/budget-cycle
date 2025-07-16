@@ -194,7 +194,16 @@ export default function Show() {
             values: ['True Sustaining', 'One-off'],
             } },
         { headerName: "Category", field: "category", filter: 'agTextColumnFilter', agTextColumnFilter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
-            values: ['English', 'Spanish', 'French', 'Portuguese'],
+            values: ['Process Facilities',
+                'Power',
+                'Process Facilities',
+                'Mine Development',
+                'HSE',
+                'TECHNOLOGY',
+                'Administrative',
+                'Mobile Equipment',
+                'Tailings, Dams and Piles',
+            ],
             } },
         { headerName: "Risk Residual", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
         { headerName: "Risk Forecast", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
@@ -203,8 +212,8 @@ export default function Show() {
         { headerName: "Actual to Date Cost", field: "actual_to_date_cost",enableCellChangeFlash: false, filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "Budget 5YP Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
         { headerName: "Budget 5YP Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-        { headerName: "Forecast Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
         { headerName: "Forecast Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+        { headerName: "Forecast Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
         { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
@@ -227,7 +236,7 @@ export default function Show() {
                 return { values };
             }
         },
-        { headerName: "FM New", field: "fm_new", enableCellChangeFlash: false, filter: 'agTextColumnFilter' },
+        { headerName: "Fund", field: "fm_new", enableCellChangeFlash: false, filter: 'agTextColumnFilter' },
         { headerName: "Top",  field: "top",  filter: 'agTextColumnFilter', minWidth:90, hide: activeTab === 'Tab1' ? true : false, cellEditor: "agSelectCellEditor", enableCellChangeFlash: false,
             cellEditorParams: (params) => {
                 const values = [];
@@ -637,6 +646,30 @@ export default function Show() {
             data[`total_${type}_${year}`] = total;
         }
 
+        const defineBudget5YP = (type) => {
+            let budget5yp = 0;
+            let budgetCar = data['budget_car'];
+            const forecast = data[`forecast_${type}`];
+            let total = budgetCar - forecast;
+
+            if(forecast == null) {
+                data['budget_5yp_cost'] = budgetCar - data['forecast_cost']
+                data['budget_5yp'] = budgetCar - data['forecast_cash']
+            } else {
+                if(type == 'cost'){
+                    data[`budget_5yp_cost`] = total;
+                } else {
+                    data['budget_5yp'] = total
+                }
+
+            }
+       
+            api.refreshCells({
+                rowNodes: [node],
+                force: true
+            });
+        }
+
 
         // Check if cash field changed
         if (/^cash_\d{4}$/.test(colDef.field)) {
@@ -685,6 +718,14 @@ export default function Show() {
 
         if(colDef.field === 'top'){
             cashDistribute(data)
+        }
+
+        if(colDef.field === 'budget_car' || colDef.field === 'forecast_cost' || colDef.field === 'forecast_cash'){
+            let type = colDef.field.split("_")[1];
+            if(type == 'car') {
+                type = null
+            }
+            defineBudget5YP(type)
         }
 
         try {
@@ -741,8 +782,6 @@ export default function Show() {
             console.error("Update error:", error);
         }
     };
-
-
 
     const handleFullscreen = () => {
         const elem = gridRef.current;
