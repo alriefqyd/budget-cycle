@@ -21,8 +21,8 @@ export default function Dashboard() {
             {
                 type: 'bar',
                 xKey: 'year',
-                yKey: 'approved',
-                yName: 'Approved 2024–2028',
+                yKey: 'plan',
+                yName: 'Plan 2026–2030',
                 fill: '#F4B740',
                 grouped: true,
                 label: {
@@ -38,7 +38,7 @@ export default function Dashboard() {
                 type: 'bar',
                 xKey: 'year',
                 yKey: 'plan',
-                yName: 'Plan 2025–2029',
+                yName: 'Approved 2025–2029',
                 fill: '#007B82',
                 grouped: true,
                 label: {
