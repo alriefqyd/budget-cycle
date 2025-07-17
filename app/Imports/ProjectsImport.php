@@ -158,8 +158,8 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                 ]);
             }
 
-            $budget5yp = ($row['budget_car'] ?? 0) - ($row['forecast_cash'] ?? 0);
-            $budget5yp_cost = ($row['budget_car'] ?? 0) - ($row['forecast_cost'] ?? 0);
+            $budget5yp = ($row['budget_car'] ?? 0) - ($row['forecast_cash'] ?? 0) - ($row['forecast_cash'] ?? 0);
+            $budget5yp_cost = ($row['budget_car'] ?? 0) - ($row['forecast_cost'] ?? 0) - ($row['forecast_cost'] ?? 0);
 
             // Ensure the project is saved and has an ID before using it
             BudgetSetting::create([
@@ -176,6 +176,8 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                 'project_id' => $project->id,
                 'total_cash' => $totalCash,
                 'total_cost' => $totalCost,
+                'cost_remaining' => $budget5yp_cost - $totalCost,
+                'cash_remaining' => $budget5yp - $totalCash
             ]);
         }
     }

@@ -569,8 +569,9 @@ export default function Show() {
         }
         const budgetDistribute = (data) => {
             const years = data['num_of_year_budget'];
-            const budgetPerYear = data['budget_5yp'] / years;
-            const budgetCostPerYear = data['budget_5yp_cost'] / years;
+            /* if budget 5yp minus, than will distribute 0 */
+            const budgetPerYear = data['budget_5yp'] > 0 ? data['budget_5yp'] / years : 0;
+            const budgetCostPerYear = data['budget_5yp_cost'] > 0 ? data['budget_5yp_cost'] / years : 0;
             const newStartYear = parseInt(data['start_year']);
             const newEndYear = newStartYear + parseInt(years) - 1;
 
@@ -609,7 +610,7 @@ export default function Show() {
                 data['cash_remaining'] = rem;
             }
             if(totalField === "total_cost"){
-                let rem = parseFloat(data['budget_5yp']) - total;
+                let rem = parseFloat(data['budget_5yp_cost']) - total;
                 data['cost_remaining'] = rem;
             }
         }
