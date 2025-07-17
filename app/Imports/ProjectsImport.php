@@ -162,7 +162,7 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             BudgetSetting::create([
                 'budget_car' => is_numeric($row['budget_car']) ? $row['budget_car'] : null,
                 'actual_to_date' => is_numeric($row['actual_to_date'] ?? null) ? $row['actual_to_date'] : null,
-                'actual_to_date_cost' => is_numeric($row['actual_to_date_cost'] ?? null) ? $row['actual_to_date'] : null,
+                'actual_to_date_cost' => is_numeric($row['actual_to_date_cost'] ?? null) ? $row['actual_to_date_cost'] : null,
                 'budget_5yp' => $budget5yp,
                 'budget_5yp_cost' => $budget5yp_cost,
                 'forecast_cost' => is_numeric($row['forecast_cost'] ?? null) ? $row['forecast_cost'] : null,
