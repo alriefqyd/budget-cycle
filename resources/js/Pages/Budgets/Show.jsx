@@ -530,8 +530,10 @@ export default function Show() {
                 data[`cost_${index+1}_${year}`] = budgetPerMonth;
             })
         }
-        const budgetDistribute = (budgets, years) => {
-            const budgetPerYear = budgets / years;
+        const budgetDistribute = (data) => {
+            const years = data['num_of_year_budget'];
+            const budgetPerYear = data['budget_5yp'] / years;
+            const budgetCostPerYear = data['budget_5yp_cost'] / years;
             const newStartYear = parseInt(data['start_year']);
             const newEndYear = newStartYear + parseInt(years) - 1;
 
@@ -540,7 +542,7 @@ export default function Show() {
                 let fieldCash = `cash_${year}`;
                 if (year >= newStartYear && year <= newEndYear) {
                     data[fieldCash] = budgetPerYear;
-                    data[fieldCost] = budgetPerYear;
+                    data[fieldCost] = budgetCostPerYear;
                 } else {
                     data[fieldCash] = 0;
                     data[fieldCost] = 0;
@@ -548,11 +550,11 @@ export default function Show() {
                 budgetDistributeMonthly(budgetPerYear, year)
             }
 
-            if(colDef.field === 'budget_5yp'){
-                data['total_cash'] = budgets;
-            } else {
-                data['budget_5yp'] = budgets;
-            }
+            // if(colDef.field === 'budget_5yp'){
+            //     data['total_cash'] = budgets;
+            // } else {
+            //     data['budget_5yp'] = budgets;
+            // }
 
             updateTotal('cash','total_cash');
             updateTotal('cost','total_cost');
@@ -661,9 +663,8 @@ export default function Show() {
                 } else {
                     data['budget_5yp'] = total
                 }
-
             }
-       
+
             api.refreshCells({
                 rowNodes: [node],
                 force: true
@@ -708,13 +709,13 @@ export default function Show() {
             updateTotalMonthly('cash',colDef.field.split("_")[2])
         }
 
-        if (colDef.field === 'budget_5yp' || colDef.field === 'num_of_year_budget' || colDef.field === 'start_year') {
-            budgetDistribute(data['budget_5yp'], data['num_of_year_budget']);
+        if (colDef.field === 'budget_5yp' || colDef.field === 'budget_5yp_cost' || colDef.field === 'num_of_year_budget' || colDef.field === 'start_year') {
+            budgetDistribute(data);
         }
 
-        if(colDef.field === 'total_cash'){
+        /*if(colDef.field === 'total_cash'){
             budgetDistribute(data['total_cash'], data['num_of_year_budget']);
-        }
+        }*/
 
         if(colDef.field === 'top'){
             cashDistribute(data)

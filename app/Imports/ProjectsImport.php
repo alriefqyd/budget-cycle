@@ -53,8 +53,8 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
 
     public function map($row): array{
         return [
-            'sap_code' => $row[1],
-            'project_title' => $row[2],
+            'sap_code' => $row[1] ?? null,
+            'project_title' => $row[2] ?? "",
             'note' => $row[3] ?? "",
             'status_progress' => $row[4] ?? "",
             'project_manager' => $row[5] ?? "",
@@ -108,70 +108,72 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         ];
 
         $uniqueValue = $row['sap_code'];
-        if(!isset($uniqueValue)){
-            return;
-        }
-        $this->uniqueIdentifiers[] = $uniqueValue;
-        $project = Projects::create([
-            'sap_code' => $row['sap_code'],
-            'project_title' => $row['project_title'],
-            'note' => $row['note'],
-            'status_progress' => $row['status_progress'],
-            'project_manager' => $row['project_manager'],
-            'project_control' => $row['project_control'],
-            'directorate' => $row['directorate'],
-            'owner_area' => $row['owner_area'],
-            'type_of_investment' => $row['type_of_investment'],
-            'category' => $row['category'],
-            'risk' => $row['risk'],
-            'fm_new' => $row['fm_new'],
-            'year_period' => $row['year_period'],
-        ]);
+        if ($row['sap_code'] !== null && preg_match('/^C[1-9]/', $row['sap_code'])) {
+            $this->uniqueIdentifiers[] = $uniqueValue;
+            $project = Projects::create([
+                'sap_code' => $row['sap_code'],
+                'project_title' => $row['project_title'],
+                'note' => $row['note'],
+                'status_progress' => $row['status_progress'],
+                'project_manager' => $row['project_manager'],
+                'project_control' => $row['project_control'],
+                'directorate' => $row['directorate'],
+                'owner_area' => $row['owner_area'],
+                'type_of_investment' => $row['type_of_investment'],
+                'category' => $row['category'],
+                'risk' => $row['risk'],
+                'fm_new' => $row['fm_new'],
+                'year_period' => $row['year_period'],
+            ]);
 
-        /* CASH LOOP */
-        $totalCash = 0;
-        for ($i = 0; $i < count($cashFields); $i++) {
-            $year = $this->year + $i;
-            $cashKey = $cashFields[$i];
-            $amount = is_numeric($row[$cashKey]) ? $row[$cashKey] : null;
-            $totalCash += $amount;
-            CashCostYearly::create([
-                'year' => $year,
+            /* CASH LOOP */
+            $totalCash = 0;
+            for ($i = 0; $i < count($cashFields); $i++) {
+                $year = $this->year + $i;
+                $cashKey = $cashFields[$i];
+                $amount = is_numeric($row[$cashKey]) ? $row[$cashKey] : null;
+                $totalCash += $amount;
+                CashCostYearly::create([
+                    'year' => $year,
+                    'project_id' => $project->id,
+                    'type' => 'cash',
+                    'amount' => $amount,
+                ]);
+            }
+
+            $totalCost = 0;
+            for ($i = 0; $i < count($costFields); $i++) {
+                $year = $this->year + $i;
+                $cashKey = $costFields[$i];
+                $amount = is_numeric($row[$cashKey]) ? $row[$cashKey] : null;
+                $totalCost += $amount;
+                CashCostYearly::create([
+                    'year' => $year,
+                    'project_id' => $project->id,
+                    'type' => 'cost',
+                    'amount' => $amount,
+                ]);
+            }
+
+            $budget5yp = ($row['budget_car'] ?? 0) - ($row['forecast_cash'] ?? 0);
+            $budget5yp_cost = ($row['budget_car'] ?? 0) - ($row['forecast_cost'] ?? 0);
+
+            // Ensure the project is saved and has an ID before using it
+            BudgetSetting::create([
+                'budget_car' => is_numeric($row['budget_car']) ? $row['budget_car'] : null,
+                'actual_to_date' => is_numeric($row['actual_to_date'] ?? null) ? $row['actual_to_date'] : null,
+                'actual_to_date_cost' => is_numeric($row['actual_to_date_cost'] ?? null) ? $row['actual_to_date'] : null,
+                'budget_5yp' => $budget5yp,
+                'budget_5yp_cost' => $budget5yp_cost,
+                'forecast_cost' => is_numeric($row['forecast_cost'] ?? null) ? $row['forecast_cost'] : null,
+                'forecast_cash' => is_numeric($row['forecast_cash'] ?? null) ? $row['forecast_cash'] : null,
+                'start_year' => is_numeric($row['start_year'] ?? null) ? $row['start_year'] : null,
+                'num_of_year_budget' => $row['num_of_year_budget'] ?? null,
                 'project_id' => $project->id,
-                'type' => 'cash',
-                'amount' => $amount,
+                'total_cash' => $totalCash,
+                'total_cost' => $totalCost,
             ]);
         }
-
-        $totalCost = 0;
-        for ($i = 0; $i < count($costFields); $i++) {
-            $year = $this->year + $i;
-            $cashKey = $costFields[$i];
-            $amount = is_numeric($row[$cashKey]) ? $row[$cashKey] : null;
-            $totalCost += $amount;
-            CashCostYearly::create([
-                'year' => $year,
-                'project_id' => $project->id,
-                'type' => 'cost',
-                'amount' => $amount,
-            ]);
-        }
-
-        // Ensure the project is saved and has an ID before using it
-        BudgetSetting::create([
-            'budget_car' => is_numeric($row['budget_car']) ? $row['budget_car'] : null,
-            'actual_to_date' => is_numeric($row['actual_to_date'] ?? null) ? $row['actual_to_date'] : null,
-            'actual_to_date_cost' => is_numeric($row['actual_to_date_cost'] ?? null) ? $row['actual_to_date'] : null,
-            'budget_5yp' => is_numeric($row['budget_5yp'] ?? null) ? $row['budget_5yp'] : null,
-            'budget_5yp_cost' => is_numeric($row['budget_5yp_cost'] ?? null) ? $row['budget_5yp'] : null,
-            'forecast_cost' => is_numeric($row['forecast_cost'] ?? null) ? $row['forecast_cost'] : null,
-            'forecast_cash' => is_numeric($row['forecast_cash'] ?? null) ? $row['forecast_cash'] : null,
-            'start_year' => is_numeric($row['start_year'] ?? null) ? $row['start_year'] : null,
-            'num_of_year_budget' => $row['num_of_year_budget'] ?? null,
-            'project_id' => $project->id,
-            'total_cash' => $totalCash,
-            'total_cost' => $totalCost,
-        ]);
     }
 
     public static function afterImport(AfterImport $event){
