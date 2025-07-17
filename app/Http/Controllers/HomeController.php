@@ -10,7 +10,7 @@ use Inertia\Inertia;
 class HomeController extends Controller
 {
     public function index(){
-        $year = date('Y');
+        $year = date('Y') + 1;
         $dataChart = $this->getCashCostYearly($year);
         return Inertia::render('Dashboard',
         [
@@ -37,14 +37,14 @@ class HomeController extends Controller
         $cash5yp = $cash5yp ? round($cash5yp / 1000000, 2) : 0;
         $cost5yp = $cost5yp ? round($cost5yp / 1000000, 2) : 0;
 
-
         $data->push([
             'year' => '5YP',
             'approved' => $cash5yp,
             'plan' => $cost5yp,
         ]);
 
-        foreach (range($startYear, $startYear + 4) as $year) {
+        $lastYear = [200281789,194704553,178882078,104596538,0,0];
+        foreach (range($startYear, $startYear + 5) as $index => $year) {
             $approved = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
                 return $item->cashCostYearlies->where('type', 'cash')->where('year', $year)->sum('amount');
             });
@@ -60,7 +60,7 @@ class HomeController extends Controller
             $data->push([
                 'year' => (string) $year,
                 'approved' => $approved,
-                'plan' => $plan,
+                'plan' => (float) number_format($lastYear[$index] / 1000000,2,'.',','),
             ]);
         }
 

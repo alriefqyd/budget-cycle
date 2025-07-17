@@ -14,7 +14,7 @@ export default function Dashboard() {
             top: 50, // increase this for label space above bars
         },
         title: {
-            text: '5YP 2025–2029 Sustaining Investment Highlights',
+            text: '5YP 2026–2030 Sustaining Investment Highlights',
             fontSize: 16,
         },
         series: [

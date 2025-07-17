@@ -26,6 +26,7 @@ import {
     RowApiModule
 } from 'ag-grid-community';
 import UploadModal from "@/Components/Budgets/UploadModal.jsx";
+import UploadModalDetail from "@/Components/Budgets/UploadModalDetail.jsx";
 
 
 ModuleRegistry.registerModules([
@@ -186,7 +187,7 @@ export default function Show() {
         { headerName: "Project's Title", field: "project_title",pinned:'left', width: 300},
         { headerName: "Note", field: "note", filter: 'agTextColumnFilter' },
         { headerName: "Status", field: "status_progress", filter: 'agTextColumnFilter', cellEditor: 'agSelectCellEditor',cellEditorParams: {
-                values: ['ongoing', 'new'],
+                values: ['ongoing', 'new', 'new bc'],
             } },
         { headerName: "PM", field: "project_manager", filter: 'agTextColumnFilter', minWidth: 220 },
         { headerName: "PC", field: "project_control", filter: 'agTextColumnFilter', minWidth: 150 },
@@ -890,18 +891,18 @@ export default function Show() {
                         </button>
                     </div>
                 </div>
-                {/*<div className="mb-4 flex flex-wrap items-center justify-end">*/}
-                {/*    <div className="flex gap-2">*/}
-                {/*        <button*/}
-                {/*            onClick={() => {*/}
-                {/*                setShowModal(true)*/}
-                {/*            }}*/}
-                {/*            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"*/}
-                {/*        >*/}
-                {/*            Import Data*/}
-                {/*        </button>*/}
-                {/*    </div>*/}
-                {/*</div>*/}
+                <div className="mb-4 flex flex-wrap items-center justify-end">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => {
+                                setShowModal(true)
+                            }}
+                            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
+                        >
+                            Import Data
+                        </button>
+                    </div>
+                </div>
                 <CardWrapper mb="mb-3">
                     <div className="space-x-4">
                         <button
@@ -944,9 +945,8 @@ export default function Show() {
                 </CardWrapper>
             </ContainerWrapper>
 
-            <UploadModal
+            <UploadModalDetail
                 show={showModal}
-                onSubmit={handleImport()}
             />
         </AuthenticatedLayout>
     )
