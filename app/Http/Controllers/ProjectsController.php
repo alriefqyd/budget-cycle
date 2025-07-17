@@ -164,6 +164,7 @@ class ProjectsController extends Controller
                     'total_cost' => $request->total_cost,
                     'cost_remaining' => $request->cost_remaining,
                     'budget_car' => $request->budget_car,
+                    'bc_budget' => $request->bc_budget,
                     'project_id' => $request->id,
                     'cash_remaining' => $request->cash_remaining,
                 ]);

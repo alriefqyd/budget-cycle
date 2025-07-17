@@ -25,6 +25,7 @@ import {
     UndoRedoEditModule,
     RowApiModule
 } from 'ag-grid-community';
+import UploadModal from "@/Components/Budgets/UploadModal.jsx";
 
 
 ModuleRegistry.registerModules([
@@ -50,6 +51,7 @@ export default function Show() {
     const { projects, year, budgets } = usePage().props
     const [activeTab, setActiveTab] = useState('Tab1');
     const [selectedRow, setSelectedRow] = useState(null);
+    const [showModal, setShowModal] = useState(false);
 
     const pathParts = window.location.pathname.split('/');
     const startYear = parseInt(pathParts[pathParts.length - 1]) || new Date().getFullYear();
@@ -205,9 +207,10 @@ export default function Show() {
                 'Tailings, Dams and Piles',
             ],
             } },
-        { headerName: "Risk Residual", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
-        { headerName: "Risk Forecast", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
-        { headerName: "Approve Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Risk Residual", field: "risk_residual", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "Risk Forecast", field: "risk_forecast", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         {
             headerName: "Actual To Date ",
             children: [
@@ -451,6 +454,9 @@ export default function Show() {
         });
     };
 
+    const handleImport = () => {
+        console.log('handle import')
+    }
     const handleAddNewRow = () => {
         const newRow = {
             id: null,
@@ -464,8 +470,10 @@ export default function Show() {
             owner_area: '',
             type_of_investment: '',
             category: '',
-            risk: '',
+            risk_residual: '',
+            risk_forecast: '',
             budget_car: 0,
+            bc_budget : 0,
             actual_to_date: 0,
             budget_5yp: 0,
             start_year: startYear,
@@ -526,7 +534,6 @@ export default function Show() {
         }
 
         agGridRef.current.api.applyTransaction({ add: result.data, addIndex: 0 });
-        console.log(result);
     };
     const onSelectionChanged = () => {
         const api = agGridRef.current.api;
@@ -878,10 +885,22 @@ export default function Show() {
                             onClick={handleFullscreen}
                             className="inline-flex items-center px-2 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg shadow hover:bg-blue-700 transition"
                         >
-                            ⛶ Fullscreen
+                            ⛶ Full Screen
                         </button>
                     </div>
                 </div>
+                {/*<div className="mb-4 flex flex-wrap items-center justify-end">*/}
+                {/*    <div className="flex gap-2">*/}
+                {/*        <button*/}
+                {/*            onClick={() => {*/}
+                {/*                setShowModal(true)*/}
+                {/*            }}*/}
+                {/*            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"*/}
+                {/*        >*/}
+                {/*            Import Data*/}
+                {/*        </button>*/}
+                {/*    </div>*/}
+                {/*</div>*/}
                 <CardWrapper mb="mb-3">
                     <div className="space-x-4">
                         <button
@@ -923,6 +942,11 @@ export default function Show() {
                     </div>
                 </CardWrapper>
             </ContainerWrapper>
+
+            <UploadModal
+                show={showModal}
+                onSubmit={handleImport()}
+            />
         </AuthenticatedLayout>
     )
 }
