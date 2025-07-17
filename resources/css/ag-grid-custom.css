@@ -51,7 +51,7 @@
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.ag-header-cell {
+.ag-header-cell .ag-header-group-cell {
     line-height: 1.25rem;  /* leading-5 */
     vertical-align: middle;
     height: auto !important;
@@ -61,6 +61,12 @@
     font-weight: 600;
     font-size: 0.875rem;    /* text-sm */
     color: #ffffff;         /* text-gray-900 */
+}
+
+.ag-header-group-cell-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #ffffff;
 }
 
 /* Cells */

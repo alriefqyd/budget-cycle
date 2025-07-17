@@ -207,14 +207,44 @@ export default function Show() {
             } },
         { headerName: "Risk Residual", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
         { headerName: "Risk Forecast", field: "risk", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
-        { headerName: "Budget Car", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Actual to Date Cash", field: "actual_to_date",enableCellChangeFlash: false, filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Actual to Date Cost", field: "actual_to_date_cost",enableCellChangeFlash: false, filter: 'agTextColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Budget 5YP Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-        { headerName: "Budget 5YP Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-        { headerName: "Forecast Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-        { headerName: "Forecast Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-        { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
+        { headerName: "Approve Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        {
+            headerName: "Actual To Date ",
+            children: [
+                {
+                    headerName: "Cost",
+                    field: "actual_to_date_cost",
+                    enableCellChangeFlash: false,
+                    filter: 'agTextColumnFilter',
+                    minWidth: 150,
+                    valueFormatter: params => formatCurrency(params.value),
+                },
+                {
+                    headerName: "Cash",
+                    field: "actual_to_date",
+                    enableCellChangeFlash: false,
+                    filter: 'agTextColumnFilter',
+                    minWidth: 150,
+                    valueFormatter: params => formatCurrency(params.value)
+                },
+            ]
+        },
+        {
+            headerName: 'Budget 5YP',
+            children: [
+                { headerName: "Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
+            ]
+        },
+        {
+            headerName: "Forecast",
+            children: [
+                { headerName: "Forecast Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+                { headerName: "Forecast Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)} // Use number filter if this is numeric]
+            ]
+        },
+
+       { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
                     values.push(year.toString()); // Must be strings
