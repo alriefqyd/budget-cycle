@@ -27,6 +27,7 @@ import {
 } from 'ag-grid-community';
 import UploadModal from "@/Components/Budgets/UploadModal.jsx";
 import UploadModalDetail from "@/Components/Budgets/UploadModalDetail.jsx";
+import Swal from "sweetalert2";
 
 
 ModuleRegistry.registerModules([
@@ -53,6 +54,7 @@ export default function Show() {
     const [activeTab, setActiveTab] = useState('Tab1');
     const [selectedRow, setSelectedRow] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [loading, setLoading] = useState(false);  // <-- loading state
 
     const pathParts = window.location.pathname.split('/');
     const startYear = parseInt(pathParts[pathParts.length - 1]) || new Date().getFullYear();
@@ -234,17 +236,17 @@ export default function Show() {
             ]
         },
         {
+            headerName: "Forecast",
+            children: [
+                { headerName: "Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
+                { headerName: "Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)} // Use number filter if this is numeric]
+            ]
+        },
+        {
             headerName: 'Budget 5YP',
             children: [
                 { headerName: "Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
                 { headerName: "Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
-            ]
-        },
-        {
-            headerName: "Forecast",
-            children: [
-                { headerName: "Forecast Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-                { headerName: "Forecast Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)} // Use number filter if this is numeric]
             ]
         },
 
@@ -455,8 +457,39 @@ export default function Show() {
         });
     };
 
-    const handleImport = () => {
-        console.log('handle import')
+    const handleImport = async (data) => {
+        setLoading(true)
+        const formData = new FormData();
+        formData.append("file", data.file)
+        formData.append("year",data.year)
+
+        try {
+            const response = await axios.post('/budgets/import-project', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Upload Successful',
+                text: response.data.message,
+                timer: 2000,
+                showConfirmButton: false,
+            });
+
+        } catch (error) {
+            console.error(error);
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Upload Failed',
+                text: error.response?.data?.message || 'Something went wrong',
+            });
+        } finally {
+            setShowModal(false);
+            setLoading(false);
+        }
     }
     const handleAddNewRow = () => {
         const newRow = {
@@ -947,6 +980,11 @@ export default function Show() {
 
             <UploadModalDetail
                 show={showModal}
+                onClose={() => {
+                    if (!loading) setShowModal(false);
+                }}
+                onSubmit={handleImport}
+                loading={loading}
             />
         </AuthenticatedLayout>
     )
