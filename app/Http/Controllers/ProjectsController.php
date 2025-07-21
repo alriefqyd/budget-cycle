@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\ApprovalStatus;
 use App\Events\BudgetUpdated;
+use App\Exports\BudgetCyclePlanExport;
 use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Mockery\Exception;
 
 
 class ProjectsController extends Controller
@@ -35,6 +37,7 @@ class ProjectsController extends Controller
     {
         $projectService = new ProjectsService;
         $budgets = $projectService->getBudgetsByYear($year, null);
+
         return Inertia::render('Budgets/Show', [
             'year' => $year,
             'budgets' => $budgets,
@@ -116,6 +119,19 @@ class ProjectsController extends Controller
 
         Log::info('No file uploaded');
         return response()->json(['message' => 'No file uploaded'], 400);
+    }
+
+    public function export(Request $request){
+        try {
+            $projectService = new ProjectsService;
+            $budgets = $projectService->getBudgetsByYear($request->year, null);
+            return Excel::download(new BudgetCyclePlanExport($budgets), 'Budget-Cycle-'.$request->year.'.xlsx');
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function uploadProject(Request $request){

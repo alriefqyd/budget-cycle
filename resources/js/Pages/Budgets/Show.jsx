@@ -28,6 +28,7 @@ import {
 import UploadModal from "@/Components/Budgets/UploadModal.jsx";
 import UploadModalDetail from "@/Components/Budgets/UploadModalDetail.jsx";
 import Swal from "sweetalert2";
+import {Spinner} from "@/Components/Spinner.jsx";
 
 
 ModuleRegistry.registerModules([
@@ -215,7 +216,7 @@ export default function Show() {
         { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         {
-            headerName: "Actual To Date ",
+            headerName: "Actual Up to 2024 ",
             children: [
                 {
                     headerName: "Cost",
@@ -236,7 +237,7 @@ export default function Show() {
             ]
         },
         {
-            headerName: "Forecast",
+            headerName: "A/F 2025",
             children: [
                 { headerName: "Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
                 { headerName: "Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)} // Use number filter if this is numeric]
@@ -253,7 +254,7 @@ export default function Show() {
        { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
-                    values.push(year.toString()); // Must be strings
+                    values.push(year); // Must be strings
                 }
                 return { values };
             } },
@@ -463,7 +464,6 @@ export default function Show() {
         formData.append("file", data.file)
         formData.append("year", data.year)
 
-        console.log(data.file)
         try {
             const response = await axios.post('/budgets/import-project', formData, {
                 headers: {
@@ -492,6 +492,36 @@ export default function Show() {
             setLoading(false);
         }
     }
+
+    const handleExport = async () => {
+        setLoading(true);
+        const response = await fetch('/export/budgets', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            },
+            body: JSON.stringify({ year: startYear })
+        });
+
+        if (!response.ok) {
+            console.error("Failed to export");
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `budget-cycle-${startYear}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setLoading(false)
+    };
+
     const handleAddNewRow = () => {
         const newRow = {
             id: null,
@@ -591,7 +621,32 @@ export default function Show() {
 
     const onCellValueChanged = async (params) => {
         const { data, colDef, api, node } = params;
+        const field = params.colDef.field;
+        const oldValue = params.oldValue;
+        const newValue = params.newValue;
 
+        // Only show confirmation for these fields
+        const confirmFields = ['start_year', 'num_of_year_budget'];
+        // is column meet criteria?, if not than revert
+        if (!confirmFields.includes(field)) return;
+
+        //is column have different value?, if not revert
+        if (oldValue === newValue) return;
+
+        const result = await Swal.fire({
+            title: 'Confirm Change',
+            html: `Are you sure you want to change <b>${field}</b> from <b>${oldValue}</b> to <b>${newValue}</b>?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, change it',
+            cancelButtonText: 'No, cancel',
+            reverseButtons: true
+        });
+
+        if (!result.isConfirmed) {
+            params.node.setDataValue(field, oldValue);
+            return;
+        }
         const budgetDistributeMonthly = (budgetPerYear, year) => {
             let budgetPerMonth = 0;
             if(year < yearlyBudget && year >= data['start_year']) {
@@ -918,6 +973,17 @@ export default function Show() {
                             className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
                         >
                             Import Data
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
+                        >
+                            {loading ? (
+                                <>
+                                    <Spinner/>
+                                    <span className="ml-2">Export Data...</span>
+                                </>
+                            ) : 'Export Data' }
                         </button>
                         <button
                             onClick={handleDuplicateRow}
