@@ -37,7 +37,7 @@ export default function Dashboard() {
             {
                 type: 'bar',
                 xKey: 'year',
-                yKey: 'plan',
+                yKey: 'approved',
                 yName: 'Approved 2025–2029',
                 fill: '#007B82',
                 grouped: true,

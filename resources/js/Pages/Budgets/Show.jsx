@@ -626,33 +626,33 @@ export default function Show() {
         const oldValue = params.oldValue;
         const newValue = params.newValue;
 
-        if (suppressConfirm) {
-            suppressConfirm = false;
-            return;
-        }
-        // Only show confirmation for these fields
-        const confirmFields = ['start_year', 'num_of_year_budget'];
-        // is column meet criteria?, if not than revert
-        if (!confirmFields.includes(field)) return;
-
-        //is column have different value?, if not revert
-        if (oldValue === newValue) return;
-
-        const result = await Swal.fire({
-            title: 'Confirm Change',
-            html: `Are you sure you want to change <b>${field}</b> from <b>${oldValue}</b> to <b>${newValue}</b>?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes, change it',
-            cancelButtonText: 'No, cancel',
-            reverseButtons: true
-        });
-
-        if (!result.isConfirmed) {
-            suppressConfirm = true; // prevent re-trigger
-            params.node.setDataValue(field, oldValue);
-            return;
-        }
+        // if (suppressConfirm) {
+        //     suppressConfirm = false;
+        //     return;
+        // }
+        // // Only show confirmation for these fields
+        // const confirmFields = ['start_year', 'num_of_year_budget'];
+        // // is column meet criteria?, if not than revert
+        // if (!confirmFields.includes(field)) return;
+        //
+        // //is column have different value?, if not revert
+        // if (oldValue === newValue) return;
+        //
+        // const result = await Swal.fire({
+        //     title: 'Confirm Change',
+        //     html: `Are you sure you want to change <b>${field}</b> from <b>${oldValue}</b> to <b>${newValue}</b>?`,
+        //     icon: 'warning',
+        //     showCancelButton: true,
+        //     confirmButtonText: 'Yes, change it',
+        //     cancelButtonText: 'No, cancel',
+        //     reverseButtons: true
+        // });
+        //
+        // if (!result.isConfirmed) {
+        //     suppressConfirm = true; // prevent re-trigger
+        //     params.node.setDataValue(field, oldValue);
+        //     return;
+        // }
         const budgetDistributeMonthly = (budgetPerYear, year) => {
             let budgetPerMonth = 0;
             if(year < yearlyBudget && year >= data['start_year']) {

@@ -28,61 +28,32 @@
         <th>Cash - Total 2026 (USD)</th>
         <th>Cash - Total 2027 (USD)</th>
         <th>Cash - Total 2028 (USD)</th>
-        <th>2029</th>
-        <th>2030</th>
-        <th>Cash 2025-2029 (USD)</th>
+        <th>Cash - Total 2029</th>
+        <th>Cash - Total 2030</th>
+        <th>Cash 2026-2030 (USD)</th>
         <th>Cost 2026 (USD)</th>
         <th>Cost 2027 (USD)</th>
         <th>Cost 2028 (USD)</th>
         <th>Cost 2029 (USD)</th>
-        <th>Cost 2025-2029 (USD)</th>
+        <th>Cost 2030 (USD)</th>
+        <th>Cost 2026-2030 (USD)</th>
 
         <!-- Monthly Forecast Cost 2025 -->
-        <th>Jan-25 Cost</th>
-        <th>Feb-25 Cost</th>
-        <th>Mar-25 Cost</th>
-        <th>Apr-25 Cost</th>
-        <th>May-25 Cost</th>
-        <th>Jun-25 Cost</th>
-        <th>Jul-25 Cost</th>
-        <th>Aug-25 Cost</th>
-        <th>Sep-25 Cost</th>
-        <th>Oct-25 Cost</th>
-        <th>Nov-25 Cost</th>
-        <th>Dec-25 Cost</th>
-        <th>Total 2025 Cost</th>
-
-        <!-- Monthly Forecast Cash 2025 -->
-        <th>Jan-25 Cash</th>
-        <th>Feb-25 Cash</th>
-        <th>Mar-25 Cash</th>
-        <th>Apr-25 Cash</th>
-        <th>May-25 Cash</th>
-        <th>Jun-25 Cash</th>
-        <th>Jul-25 Cash</th>
-        <th>Aug-25 Cash</th>
-        <th>Sep-25 Cash</th>
-        <th>Oct-25 Cash</th>
-        <th>Nov-25 Cash</th>
-        <th>Dec-25 Cash</th>
-        <th>Total 2025 Cash</th>
-
-        <!-- Monthly Forecast Cost 2026 -->
         <th>Jan-26 Cost</th>
-        <th>Feb-26 Cost</th>
-        <th>Mar-26 Cost</th>
-        <th>Apr-26 Cost</th>
-        <th>May-26 Cost</th>
-        <th>Jun-26 Cost</th>
-        <th>Jul-26 Cost</th>
-        <th>Aug-26 Cost</th>
-        <th>Sep-26 Cost</th>
-        <th>Oct-26 Cost</th>
-        <th>Nov-26 Cost</th>
-        <th>Dec-26 Cost</th>
+        <th>Feb-27 Cost</th>
+        <th>Mar-28 Cost</th>
+        <th>Apr-29 Cost</th>
+        <th>May-30 Cost</th>
+        <th>Jun-31 Cost</th>
+        <th>Jul-32 Cost</th>
+        <th>Aug-33 Cost</th>
+        <th>Sep-34 Cost</th>
+        <th>Oct-35 Cost</th>
+        <th>Nov-36 Cost</th>
+        <th>Dec-37 Cost</th>
         <th>Total 2026 Cost</th>
 
-        <!-- Monthly Forecast Cash 2026 -->
+        <!-- Monthly Forecast Cash 2025 -->
         <th>Jan-26 Cash</th>
         <th>Feb-26 Cash</th>
         <th>Mar-26 Cash</th>
@@ -96,6 +67,36 @@
         <th>Nov-26 Cash</th>
         <th>Dec-26 Cash</th>
         <th>Total 2026 Cash</th>
+
+        <!-- Monthly Forecast Cost 2026 -->
+        <th>Jan-27 Cost</th>
+        <th>Feb-27 Cost</th>
+        <th>Mar-27 Cost</th>
+        <th>Apr-27 Cost</th>
+        <th>May-27 Cost</th>
+        <th>Jun-27 Cost</th>
+        <th>Jul-27 Cost</th>
+        <th>Aug-27 Cost</th>
+        <th>Sep-27 Cost</th>
+        <th>Oct-27 Cost</th>
+        <th>Nov-27 Cost</th>
+        <th>Dec-27 Cost</th>
+        <th>Total 2027 Cost</th>
+
+        <!-- Monthly Forecast Cash 2026 -->
+        <th>Jan-27 Cash</th>
+        <th>Feb-27 Cash</th>
+        <th>Mar-27 Cash</th>
+        <th>Apr-27 Cash</th>
+        <th>May-27 Cash</th>
+        <th>Jun-27 Cash</th>
+        <th>Jul-27 Cash</th>
+        <th>Aug-27 Cash</th>
+        <th>Sep-27 Cash</th>
+        <th>Oct-27 Cash</th>
+        <th>Nov-27 Cash</th>
+        <th>Dec-27 Cash</th>
+        <th>Total 2027 Cash</th>
     </tr>
     </thead>
     <tbody>
@@ -136,6 +137,7 @@
             <td>{{ $budget['cost_2027'] }}</td>
             <td>{{ $budget['cost_2028'] }}</td>
             <td>{{ $budget['cost_2029'] }}</td>
+            <td>{{ $budget['cost_2030'] }}</td>
             <td>{{ $budget['total_cost'] }}</td>
 
             {{-- Placeholder for monthly cost and cash (2025 and 2026) --}}

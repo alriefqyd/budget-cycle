@@ -32,7 +32,7 @@ class BudgetCyclePlanExport implements FromView, ShouldAutoSize, WithStyles
 
     public function styles(Worksheet $sheet)
     {
-        $sheet->getStyle('A1:CH1')->applyFromArray([
+        $sheet->getStyle('A1:CJ1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'italic' => false,

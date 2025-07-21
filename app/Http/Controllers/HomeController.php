@@ -60,7 +60,7 @@ class HomeController extends Controller
             $data->push([
                 'year' => (string) $year,
                 'approved' => $approved,
-                'plan' => (float) number_format($lastYear[$index] / 1000000,2,'.',','),
+                'plan' => $plan,
             ]);
         }
 

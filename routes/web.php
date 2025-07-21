@@ -18,7 +18,7 @@ Route::get('/dashboard', [\App\Http\Controllers\HomeController::class, 'index'])
 Route::get('/budgets', [\App\Http\Controllers\ProjectsController::class, 'index'])->middleware(['auth'])->name('budget-list');
 Route::get('/budgets/{year}', [\App\Http\Controllers\ProjectsController::class, 'show'])->middleware(['auth'])->name('budget-show');
 Route::post('/budgets/upload', [\App\Http\Controllers\ProjectsController::class, 'upload'])->middleware(['auth'])->name('budget-upload');
-Route::post('/export/budgets', [\App\Http\Controllers\ProjectsController::class, 'export'])->middleware(['auth'])->name('budget-upload');
+Route::post('/export/budgets', [\App\Http\Controllers\ProjectsController::class, 'export'])->middleware(['auth'])->name('budget-detail-upload');
 Route::post('/budgets/import-project', [\App\Http\Controllers\ProjectsController::class, 'uploadproject'])->middleware(['auth'])->name('budget-upload');
 Route::post('/budgets/create', [\App\Http\Controllers\ProjectsController::class, 'create'])->middleware(['auth'])->name('budget-upload');
 Route::put('/budgets/{id}', [\App\Http\Controllers\ProjectsController::class, 'update'])->middleware(['auth'])->name('budget-update');
