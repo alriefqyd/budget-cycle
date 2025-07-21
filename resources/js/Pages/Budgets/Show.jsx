@@ -905,11 +905,19 @@ export default function Show() {
                     </div>
 
                     <div className="flex gap-2">
+                        {/*<button*/}
+                        {/*    onClick={handleAddNewRow}*/}
+                        {/*    className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"*/}
+                        {/*>*/}
+                        {/*    + Add New Row*/}
+                        {/*</button>*/}
                         <button
-                            onClick={handleAddNewRow}
+                            onClick={() => {
+                                setShowModal(true)
+                            }}
                             className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
                         >
-                            + Add New Row
+                            Import Data
                         </button>
                         <button
                             onClick={handleDuplicateRow}
@@ -927,14 +935,14 @@ export default function Show() {
                 </div>
                 <div className="mb-4 flex flex-wrap items-center justify-end">
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => {
-                                setShowModal(true)
-                            }}
-                            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
-                        >
-                            Import Data
-                        </button>
+                        {/*<button*/}
+                        {/*    onClick={() => {*/}
+                        {/*        setShowModal(true)*/}
+                        {/*    }}*/}
+                        {/*    className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"*/}
+                        {/*>*/}
+                        {/*    Import Data*/}
+                        {/*</button>*/}
                     </div>
                 </div>
                 <CardWrapper mb="mb-3">
