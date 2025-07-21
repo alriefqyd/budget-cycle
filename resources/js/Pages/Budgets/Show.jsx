@@ -254,7 +254,7 @@ export default function Show() {
        { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
-                    values.push(year); // Must be strings
+                    values.push(year.toString()); // Must be strings
                 }
                 return { values };
             } },
@@ -619,12 +619,17 @@ export default function Show() {
         });
     };
 
+    let suppressConfirm = false;
     const onCellValueChanged = async (params) => {
         const { data, colDef, api, node } = params;
         const field = params.colDef.field;
         const oldValue = params.oldValue;
         const newValue = params.newValue;
 
+        if (suppressConfirm) {
+            suppressConfirm = false;
+            return;
+        }
         // Only show confirmation for these fields
         const confirmFields = ['start_year', 'num_of_year_budget'];
         // is column meet criteria?, if not than revert
@@ -644,6 +649,7 @@ export default function Show() {
         });
 
         if (!result.isConfirmed) {
+            suppressConfirm = true; // prevent re-trigger
             params.node.setDataValue(field, oldValue);
             return;
         }
