@@ -55,7 +55,8 @@ class HomeController extends Controller
 
             // Round to 2 decimals instead of formatting
             $approved = $approved ? round($approved / 1000000, 2) : 0;
-            $plan = $plan ? round($plan / 1000000, 2) : 0;
+//            $plan = $plan ? round($plan / 1000000, 2) : 0;
+            $plan = $lastYear[$index] ? round($lastYear[$index] / 1000000, 2) : 0;
 
             $data->push([
                 'year' => (string) $year,

@@ -786,18 +786,21 @@ export default function Show() {
             let budget5yp = 0;
             let budgetCar = data['budget_car'];
             const forecast = data[`forecast_${type}`];
-            let total = budgetCar - forecast;
+            // let total = budgetCar - data['actual_to_date'] - forecast;
 
-            if(forecast == null) {
-                data['budget_5yp_cost'] = budgetCar - data['forecast_cost']
-                data['budget_5yp'] = budgetCar - data['forecast_cash']
-            } else {
-                if(type == 'cost'){
-                    data[`budget_5yp_cost`] = total;
-                } else {
-                    data['budget_5yp'] = total
-                }
-            }
+            data['budget_5yp_cost'] = budgetCar - data['actual_to_date_cost'] - data['forecast_cost']
+            data['budget_5yp'] = budgetCar - data['actual_to_date'] - data['forecast_cash']
+
+            // if(forecast == null) {
+            //     data['budget_5yp_cost'] = budgetCar - data['actual_to_date_cost'] - data['forecast_cost']
+            //     data['budget_5yp'] = budgetCar - data['actual_to_date'] - data['forecast_cash']
+            // } else {
+            //     if(type == 'cost'){
+            //         data[`budget_5yp_cost`] = total;
+            //     } else {
+            //         data['budget_5yp'] = total
+            //     }
+            // }
 
             api.refreshCells({
                 rowNodes: [node],
@@ -855,8 +858,11 @@ export default function Show() {
             cashDistribute(data)
         }
 
-        if(colDef.field === 'budget_car' || colDef.field === 'forecast_cost' || colDef.field === 'forecast_cash'){
+        if(colDef.field === 'budget_car' || colDef.field === 'forecast_cost' || colDef.field === 'forecast_cash' ||
+            colDef.field === 'actual_to_date' || colDef.field === 'actual_to_date_cost'
+        ){
             let type = colDef.field.split("_")[1];
+            //if type budget car
             if(type == 'car') {
                 type = null
             }
