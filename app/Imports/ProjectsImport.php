@@ -23,17 +23,18 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
     WithUpserts, WithChunkReading, WithEvents
 {
     /**
-    * @param array $row
-    *
-    * @return \Illuminate\Database\Eloquent\Model|null
-    */
+     * @param array $row
+     *
+     * @return \Illuminate\Database\Eloquent\Model|null
+     */
     use RemembersRowNumber;
     use Importable;
     use RegistersEventListeners;
 
     private $uniqueIdentifiers = [];
-    public function __construct($year){
+    public function __construct($year, $isBudgetCycle){
         $this->year = $year;
+        $this->isBudgetCycle = $isBudgetCycle;
     }
     public function batchSize(): int{
         return 1000;
@@ -109,25 +110,48 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             'cost_fifth',
         ];
 
-        $uniqueValue = $row['sap_code'];
+        $project = null;
+        // Mark SAP code as imported
+        $this->uniqueIdentifiers[] = $row['sap_code'];
         if ($row['sap_code'] !== null && preg_match('/^C[1-9]/', $row['sap_code'])) {
-            $this->uniqueIdentifiers[] = $uniqueValue;
-            $project = Projects::create([
-                'sap_code' => $row['sap_code'],
-                'project_title' => $row['project_title'],
-                'note' => $row['note'],
-                'status_progress' => $row['status_progress'],
-                'project_manager' => $row['project_manager'],
-                'project_control' => $row['project_control'],
-                'directorate' => $row['directorate'],
-                'owner_area' => $row['owner_area'],
-                'type_of_investment' => $row['type_of_investment'],
-                'category' => $row['category'],
-                'risk_residual' => $row['risk_residual'],
-                'risk_forecast' => $row['risk_forecast'],
-                'fm_new' => $row['fm_new'],
-                'year_period' => $row['year_period'],
-            ]);
+            if ($this->isBudgetCycle) {
+                // Check if existing project
+                $project = Projects::updateOrCreate(
+                    ['sap_code' => $row['sap_code']],
+                    [
+                        'project_title' => $row['project_title'],
+                        'note' => $row['note'],
+                        'status_progress' => $row['status_progress'],
+                        'project_manager' => $row['project_manager'],
+                        'project_control' => $row['project_control'],
+                        'directorate' => $row['directorate'],
+                        'owner_area' => $row['owner_area'],
+                        'type_of_investment' => $row['type_of_investment'],
+                        'category' => $row['category'],
+                        'risk_residual' => $row['risk_residual'],
+                        'risk_forecast' => $row['risk_forecast'],
+                        'fm_new' => $row['fm_new'],
+                        'year_period' => $row['year_period'],
+                    ]
+                );
+            } else {
+                $project = Projects::create([
+                    'sap_code' => $row['sap_code'],
+                    'project_title' => $row['project_title'],
+                    'note' => $row['note'],
+                    'status_progress' => $row['status_progress'],
+                    'project_manager' => $row['project_manager'],
+                    'project_control' => $row['project_control'],
+                    'directorate' => $row['directorate'],
+                    'owner_area' => $row['owner_area'],
+                    'type_of_investment' => $row['type_of_investment'],
+                    'category' => $row['category'],
+                    'risk_residual' => $row['risk_residual'],
+                    'risk_forecast' => $row['risk_forecast'],
+                    'fm_new' => $row['fm_new'],
+                    'year_period' => $row['year_period'],
+                ]);
+            }
 
             /* CASH LOOP */
             $totalCash = 0;
@@ -136,12 +160,16 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                 $cashKey = $cashFields[$i];
                 $amount = is_numeric($row[$cashKey]) ? $row[$cashKey] : null;
                 $totalCash += $amount;
-                CashCostYearly::create([
-                    'year' => $year,
-                    'project_id' => $project->id,
-                    'type' => 'cash',
-                    'amount' => $amount,
-                ]);
+                CashCostYearly::updateOrCreate(
+                    [
+                        'year' => $year,
+                        'project_id' => $project->id,
+                        'type' => 'cash',
+                    ],
+                    [
+                        'amount' => $amount,
+                    ]
+                );
             }
 
             $totalCost = 0;
@@ -150,35 +178,43 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                 $cashKey = $costFields[$i];
                 $amount = is_numeric($row[$cashKey]) ? $row[$cashKey] : null;
                 $totalCost += $amount;
-                CashCostYearly::create([
-                    'year' => $year,
-                    'project_id' => $project->id,
-                    'type' => 'cost',
-                    'amount' => $amount,
-                ]);
+                CashCostYearly::updateOrCreate(
+                    [
+                        'year' => $year,
+                        'project_id' => $project->id,
+                        'type' => 'cost',
+                    ],
+                    [
+                        'amount' => $amount,
+                    ]
+                );
             }
 
-            $budget5yp = ($row['budget_car'] ?? 0) - ($row['actual_to_date'] ?? 0) - ($row['forecast_cash'] ?? 0);
-            $budget5yp_cost = ($row['budget_car'] ?? 0) - ($row['actual_to_date_cost'] ?? 0) - ($row['forecast_cost'] ?? 0);
+            $budget5yp = ((float)$row['budget_car'] ?? 0) - ((float)$row['actual_to_date'] ?? 0) - ((float)$row['forecast_cash'] ?? 0);
+            $budget5yp_cost = ((float)$row['budget_car'] ?? 0) - ((float)$row['actual_to_date_cost'] ?? 0) - ((float)$row['forecast_cost'] ?? 0);
 
+            // Delete first if is budget cycle
             // Ensure the project is saved and has an ID before using it
-            BudgetSetting::create([
-                'budget_car' => is_numeric($row['budget_car']) ? $row['budget_car'] : null,
-                'bc_budget' => is_numeric($row['bc_budget']) ? $row['bc_budget'] : null,
-                'actual_to_date' => is_numeric($row['actual_to_date'] ?? null) ? $row['actual_to_date'] : null,
-                'actual_to_date_cost' => is_numeric($row['actual_to_date_cost'] ?? null) ? $row['actual_to_date_cost'] : null,
-                'budget_5yp' => $budget5yp,
-                'budget_5yp_cost' => $budget5yp_cost,
-                'forecast_cost' => is_numeric($row['forecast_cost'] ?? null) ? $row['forecast_cost'] : null,
-                'forecast_cash' => is_numeric($row['forecast_cash'] ?? null) ? $row['forecast_cash'] : null,
-                'start_year' => is_numeric($row['start_year'] ?? null) ? $row['start_year'] : null,
-                'num_of_year_budget' => $row['num_of_year_budget'] ?? null,
-                'project_id' => $project->id,
-                'total_cash' => $totalCash,
-                'total_cost' => $totalCost,
-                'cost_remaining' => $budget5yp_cost - $totalCost,
-                'cash_remaining' => $budget5yp - $totalCash
-            ]);
+            BudgetSetting::updateOrCreate([
+                ['project_id', $project->id]],
+                [
+                    'budget_car' => is_numeric($row['budget_car']) ? $row['budget_car'] : null,
+                    'bc_budget' => is_numeric($row['bc_budget']) ? $row['bc_budget'] : null,
+                    'actual_to_date' => is_numeric($row['actual_to_date'] ?? null) ? $row['actual_to_date'] : null,
+                    'actual_to_date_cost' => is_numeric($row['actual_to_date_cost'] ?? null) ? $row['actual_to_date_cost'] : null,
+                    'budget_5yp' => $budget5yp,
+                    'budget_5yp_cost' => $budget5yp_cost,
+                    'forecast_cost' => is_numeric($row['forecast_cost'] ?? null) ? $row['forecast_cost'] : null,
+                    'forecast_cash' => is_numeric($row['forecast_cash'] ?? null) ? $row['forecast_cash'] : null,
+                    'start_year' => is_numeric($row['start_year'] ?? null) ? $row['start_year'] : null,
+                    'num_of_year_budget' => $row['num_of_year_budget'] ?? null,
+                    'project_id' => $project->id,
+                    'total_cash' => $totalCash,
+                    'total_cost' => $totalCost,
+                    'cost_remaining' => $budget5yp_cost - $totalCost,
+                    'cash_remaining' => $budget5yp - $totalCash
+                ]
+            );
         }
     }
 
@@ -187,4 +223,18 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
 //        $importInstance = $event->getConcernable();
 //        Projects::whereNotIn('sap_code', $importInstance->uniqueIdentifiers)->delete();
     }
+
+//    public function registerEvents(): array
+//    {
+//        return [
+//            AfterImport::class => function (AfterImport $event) {
+//                Log::info('AfterImport event fired');
+//
+//                // Only delete old projects if budget cycle is active
+//                if ($this->isBudgetCycle) {
+//                    Projects::whereNotIn('sap_code', $this->uniqueIdentifiers)->delete();
+//                }
+//            },
+//        ];
+//    }
 }

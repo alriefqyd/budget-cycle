@@ -461,8 +461,9 @@ export default function Show() {
         setLoading(true)
         const formData = new FormData();
         formData.append("file", data.file)
-        formData.append("year",data.year)
+        formData.append("year", data.year)
 
+        console.log(data.file)
         try {
             const response = await axios.post('/budgets/import-project', formData, {
                 headers: {

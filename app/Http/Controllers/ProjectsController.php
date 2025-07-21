@@ -96,7 +96,6 @@ class ProjectsController extends Controller
                 'data' => []
             ]);
         }
-
     }
 
     public function upload(Request $request){
@@ -105,8 +104,30 @@ class ProjectsController extends Controller
             Log::info('Starting import projects...');
 
             try {
-                Excel::import(new ProjectsImport($request->year), $file);
+                Excel::import(new ProjectsImport($request->year, false), $file);
                 Log::info('Import project successful');
+                return response()->json(['message' => 'Import Successful']);
+            } catch (\Exception $e) {
+                DB::rollback();
+                Log::error('Import error: ' . $e->getMessage());
+                return response()->json(['message' => $e->getMessage()], 500);
+            }
+        }
+
+        Log::info('No file uploaded');
+        return response()->json(['message' => 'No file uploaded'], 400);
+    }
+
+    public function uploadProject(Request $request){
+        $file = $request->file('file');
+        if ($request->hasFile('file')) {
+            Log::info('Starting import projects...');
+            try {
+                $projectService = new ProjectsService;
+                $importClass = new ProjectsImport($request->year, true);
+                Excel::import($importClass, $file);
+                Log::info('Import project successful');
+                $projectService->updateBudgets($request->year_period, null);
                 return response()->json(['message' => 'Import Successful']);
             } catch (\Exception $e) {
                 DB::rollback();
