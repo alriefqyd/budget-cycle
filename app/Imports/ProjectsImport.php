@@ -6,6 +6,7 @@ use App\Models\BudgetSetting;
 use App\Models\CashCostYearly;
 use App\Models\project;
 use App\Models\Projects;
+use App\Services\ProjectsService;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\Importable;
 use Maatwebsite\Excel\Concerns\RegistersEventListeners;
@@ -78,16 +79,18 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             'start_year' => $row[21] ?? "",
             'num_of_year_budget' => $row[22] ?? "",
             'fm_new' => $row[23] ?? "",
-            'cash_first' => $row[24] ?? "",
-            'cash_second' => $row[25] ?? "",
-            'cash_third' => $row[26] ?? "",
-            'cash_fourth' => $row[27] ?? "",
-            'cash_fifth' => $row[28] ?? "",
-            'cost_first' => $row[29] ?? "",
-            'cost_second' => $row[30] ?? "",
-            'cost_third' => $row[31] ?? "",
-            'cost_fourth' => $row[32] ?? "",
-            'cost_fifth' => $row[33] ?? "",
+            'cost_first' => $row[24] ?? "",
+            'cost_second' => $row[25] ?? "",
+            'cost_third' => $row[26] ?? "",
+            'cost_fourth' => $row[27] ?? "",
+            'cost_fifth' => $row[28] ?? "",
+            'cost_total' => $row[29] ?? "",
+            'cash_first' => $row[30] ?? "",
+            'cash_second' => $row[31] ?? "",
+            'cash_third' => $row[32] ?? "",
+            'cash_fourth' => $row[33] ?? "",
+            'cash_fifth' => $row[34] ?? "",
+            'cash_total' => $row[35] ?? "",
         ];
     }
 
@@ -215,6 +218,9 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                     'cash_remaining' => $budget5yp - $totalCash
                 ]
             );
+
+            $projectService = new ProjectsService();
+            $projectService->updateBudgets($this->year, $project->id);
         }
     }
 

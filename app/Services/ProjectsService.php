@@ -102,7 +102,7 @@ class ProjectsService
                 $item = [
                     'id' => $project->id,
                     'project_title' => $project->project_title,
-                    'year_period' => $project->year_period,
+                    'year_period' => (string) $project->year_period,
                     'status_progress' => $project->status_progress,
                     'note' => $project->note,
                     'sap_code' => $project->sap_code,
@@ -123,7 +123,7 @@ class ProjectsService
                     'bc_budget' => $project->budgets?->bc_budget,
                     'actual_to_date'=>$project->budgets?->actual_to_date,
                     'actual_to_date_cost'=>$project->budgets?->actual_to_date_cost,
-                    'start_year'=>$project->budgets?->start_year,
+                    'start_year'=> (string) $project->budgets?->start_year,
                     'num_of_year_budget'=>$project->budgets?->num_of_year_budget,
                     'total_cash' => $project->budgets?->total_cash,
                     'total_cost' => $project->budgets?->total_cost,

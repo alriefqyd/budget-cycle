@@ -143,7 +143,6 @@ class ProjectsController extends Controller
                 $importClass = new ProjectsImport($request->year, true);
                 Excel::import($importClass, $file);
                 Log::info('Import project successful');
-                $projectService->updateBudgets($request->year_period, null);
                 return response()->json(['message' => 'Import Successful']);
             } catch (\Exception $e) {
                 DB::rollback();

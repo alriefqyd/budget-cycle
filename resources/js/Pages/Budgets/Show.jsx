@@ -471,6 +471,8 @@ export default function Show() {
                 }
             })
 
+            console.log(response);
+
             Swal.fire({
                 icon: 'success',
                 title: 'Upload Successful',
@@ -671,16 +673,21 @@ export default function Show() {
             const newStartYear = parseInt(data['start_year']);
             const newEndYear = newStartYear + parseInt(years) - 1;
 
+            //distribute budget cash cost based on start year
             for (let year = startYear; year <= endYear; year++) {
                 let fieldCost = `cost_${year}`;
                 let fieldCash = `cash_${year}`;
-                if (year >= newStartYear && year <= newEndYear) {
-                    data[fieldCash] = budgetPerYear;
-                    data[fieldCost] = budgetCostPerYear;
-                } else {
-                    data[fieldCash] = 0;
-                    data[fieldCost] = 0;
+                //check if start yaer is exist and not zero
+                if(data['start_year'] !== null && data['start_year'] > 2000){
+                    if (year >= newStartYear && year <= newEndYear) {
+                        data[fieldCash] = budgetPerYear;
+                        data[fieldCost] = budgetCostPerYear;
+                    } else {
+                        data[fieldCash] = 0;
+                        data[fieldCost] = 0;
+                    }
                 }
+
                 budgetDistributeMonthly(budgetPerYear, year)
             }
 

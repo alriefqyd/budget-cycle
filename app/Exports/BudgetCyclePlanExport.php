@@ -21,6 +21,7 @@ class BudgetCyclePlanExport implements FromView, ShouldAutoSize, WithStyles
     public function __construct($data)
     {
         $this->data = $data;
+        $this->size = count($data);
     }
 
     public function view(): View
@@ -37,6 +38,18 @@ class BudgetCyclePlanExport implements FromView, ShouldAutoSize, WithStyles
                 'bold' => true,
                 'italic' => false,
             ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['argb' => '000000'],
+                ],
+            ],
+            'background' => [
+                'color'=> '#2978ff'
+            ],
+        ]);
+
+        $sheet->getStyle('A2:CJ'.$this->size + 2)->applyFromArray([
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
