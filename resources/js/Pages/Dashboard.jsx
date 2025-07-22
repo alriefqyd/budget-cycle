@@ -9,22 +9,24 @@ import {useEffect, useState} from "react";
 export default function Dashboard() {
     const { dataChart } = usePage().props
     const [chartOptions, setChartOptions] = useState({
-        data : dataChart,
-        padding: {
-            top: 50, // increase this for label space above bars
-        },
+        data: dataChart,
         title: {
-            text: '5YP 2026–2030 Sustaining Investment Highlights',
+            text: '5YP 2026–2030 Sustaining Investment Highlights (Cash in million)',
             fontSize: 16,
         },
         series: [
             {
+                barPadding: 0,
                 type: 'bar',
                 xKey: 'year',
                 yKey: 'plan',
-                yName: 'Approved 2025–2029',
+                barGap: 0,       // removes gap between bars within one group
+                barGrouping: true, // ensures grouping is enabled
+                yName: 'Plan 2026–2030',
                 fill: '#007B82',
                 grouped: true,
+                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
+                paddingOuter: 0.05, // optional; less gap on edges
                 label: {
                     enabled: true,
                     placement: 'outside',
@@ -34,34 +36,102 @@ export default function Dashboard() {
                     formatter: ({ value }) => `${value ?? ''}`,
                 },
             },
+            // APPROVED per year
             {
                 type: 'bar',
                 xKey: 'year',
                 yKey: 'approved',
-                yName: 'Plan 2026–2030',
+                yName: 'Approved 2025–2029',
                 fill: '#F4B740',
+                barGap: 0,       // removes gap between bars within one group
+                barGrouping: true, // ensures grouping is enabled
                 grouped: true,
+                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
+                paddingOuter: 0.05, // optional; less gap on edges
                 label: {
                     enabled: true,
                     placement: 'outside',
                     fontWeight: 'bold',
                     fontSize: 12,
-                    color: '#ffff',
+                    color: '#fff',
                     formatter: ({ value }) => `${value ?? ''}`,
                 },
             },
-
+            // 5YP PLAN – plotted on secondary axis
+            {
+                type: 'bar',
+                xKey: 'year',
+                yKey: 'totalPlan',
+                yName: '5YP Plan Total',
+                fill: '#2f74b4',
+                barGap: 0,       // removes gap between bars within one group
+                barGrouping: true, // ensures grouping is enabled
+                grouped: true,
+                stacked: false,
+                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
+                paddingOuter: 0.05, // optional; less gap on edges
+                yAxisKey: 'rightAxis',
+                label: {
+                    enabled: true,
+                    placement: 'outside',
+                    fontWeight: 'bold',
+                    fontSize: 12,
+                    color: '#fff',
+                    formatter: ({ value }) => `${value ?? ''}`,
+                },
+            },
+            // 5YP APPROVED – plotted on secondary axis
+            {
+                type: 'bar',
+                xKey: 'year',
+                yKey: 'totalApproved',
+                yName: '5YP Approved Total',
+                barGap: 0,       // removes gap between bars within one group
+                barGrouping: true, // ensures grouping is enabled
+                fill: '#91ce4f',
+                grouped: true,
+                stacked: false,
+                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
+                paddingOuter: 0.05, // optional; less gap on edges
+                yAxisKey: 'rightAxis',
+                label: {
+                    enabled: true,
+                    placement: 'outside',
+                    fontWeight: 'bold',
+                    fontSize: 12,
+                    color: '#fff',
+                    formatter: ({ value }) => `${value ?? ''}`,
+                },
+            },
         ],
-        animation: {
-            enabled: true,
-            duration: 500, // ms
-        },
         axes: [
-            { type: 'category', position: 'bottom', title: { text: 'Year' } },
-            { type: 'number', position: 'left', title: { text: 'Investment (x000 USD)' } },
+            {
+                type: 'category',
+                position: 'bottom',
+                title: { text: 'Year' },
+                paddingInner: 0.1,     // controls space between year groups
+                paddingOuter: 0.05,    // optional: space at left/right ends
+            },
+            {
+                type: 'number',
+                position: 'left',
+                title: { text: 'Investment' },
+                keys: ['plan', 'approved'],
+                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
+                paddingOuter: 0.05, // optional; less gap on edges
+            },
+            {
+                type: 'number',
+                position: 'right',
+                title: { text: '5YP Total' },
+                keys: ['totalPlan', 'totalApproved'],
+                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
+                paddingOuter: 0.05, // optional; less gap on edges
+            },
         ],
         legend: { position: 'bottom' },
     });
+
 
     // this will update data chart if broadcast exist
     useEffect(() => {
