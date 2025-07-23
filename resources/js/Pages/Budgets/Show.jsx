@@ -23,7 +23,8 @@ import {
     RowSelectionModule,
     HighlightChangesModule,
     UndoRedoEditModule,
-    RowApiModule
+    RowApiModule,
+    PinnedRowModule
 } from 'ag-grid-community';
 import UploadModal from "@/Components/Budgets/UploadModal.jsx";
 import UploadModalDetail from "@/Components/Budgets/UploadModalDetail.jsx";
@@ -45,7 +46,8 @@ ModuleRegistry.registerModules([
     RowSelectionModule,
     HighlightChangesModule,
     UndoRedoEditModule,
-    RowApiModule
+    RowApiModule,
+    PinnedRowModule
 ]);
 
 export default function Show() {
@@ -63,6 +65,7 @@ export default function Show() {
     const yearlyBudget = startYear + 2;
     const month = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const [selectedRowsState, setSelectedRowsState] = useState([]);
+    const [budgetTotalYear, setBudgetTotalYear] = useState(0);
 
     // useEffect(() => {
     //     // const channel = window.Echo.channel('budgets')
@@ -471,8 +474,6 @@ export default function Show() {
                 }
             })
 
-            console.log(response);
-
             Swal.fire({
                 icon: 'success',
                 title: 'Upload Successful',
@@ -543,7 +544,7 @@ export default function Show() {
             bc_budget : 0,
             actual_to_date: 0,
             budget_5yp: 0,
-            start_year: startYear,
+            start_year: startYear.toString(),
             num_of_year_budget: 1,
             fm_new: '',
             top: 1,
@@ -564,7 +565,7 @@ export default function Show() {
                 newRow[`cash_${i}_${year}`] = 0;
             }
         }
-
+        
         setRowData(prev => ({
             ...prev,
             data: newRow
@@ -621,12 +622,54 @@ export default function Show() {
         });
     };
 
+    const calculateTotals = (rowData) => {
+        const totals = {
+            sap_code: 'Total',
+            title: '',
+            cash_2026: 0,
+            cash_2027: 0,
+            cash_2028: 0,
+            cash_2029: 0,
+            cash_2030: 0,
+            total_cash:0,
+            cost_2026: 0,
+            cost_2027: 0,
+            cost_2028: 0,
+            cost_2029: 0,
+            cost_2030: 0,
+            total_cost:0,
+        };
+
+        rowData.forEach(row => {
+            totals.cash_2026 += parseNumber(row.cash_2026);
+            totals.cash_2027 += parseNumber(row.cash_2027);
+            totals.cash_2028 += parseNumber(row.cash_2028);
+            totals.cash_2029 += parseNumber(row.cash_2029);
+            totals.cash_2030 += parseNumber(row.cash_2030);
+            totals.total_cash += parseNumber(row.total_cash);
+            totals.cost_2026 += parseNumber(row.cost_2026);
+            totals.cost_2027 += parseNumber(row.cost_2027);
+            totals.cost_2028 += parseNumber(row.cost_2028);
+            totals.cost_2029 += parseNumber(row.cost_2029);
+            totals.cost_2030 += parseNumber(row.cost_2030);
+            totals.total_cost += parseNumber(row.total_cost);
+            // Sum cost fields too
+        });
+        return [totals];
+    };
+
+    const parseNumber = (val) => {
+        if (!val) return 0;
+        return typeof val === 'number' ? val : parseFloat(String(val).replace(/,/g, '')) || 0;
+    };
+
     let suppressConfirm = false;
     const onCellValueChanged = async (params) => {
         const { data, colDef, api, node } = params;
         const field = params.colDef.field;
         const oldValue = params.oldValue;
         const newValue = params.newValue;
+
 
         // if (suppressConfirm) {
         //     suppressConfirm = false;
@@ -655,6 +698,47 @@ export default function Show() {
         //     params.node.setDataValue(field, oldValue);
         //     return;
         // }
+
+        const calculateTotalBudget = (api) => {
+            const totals = {
+                sap_code: 'Total',
+                title: '',
+                cash_2026: 0,
+                cash_2027: 0,
+                cash_2028: 0,
+                cash_2029: 0,
+                cash_2030: 0,
+                total_cash:0,
+                cost_2026: 0,
+                cost_2027: 0,
+                cost_2028: 0,
+                cost_2029: 0,
+                cost_2030: 0,
+                total_cost:0
+            };
+
+            api.forEachNode((node) => {
+                const row = node.data;
+                if (row.sap_code === 'Total') return; // Skip total row
+
+                totals.cash_2026 += parseNumber(row.cash_2026);
+                totals.cash_2027 += parseNumber(row.cash_2027);
+                totals.cash_2028 += parseNumber(row.cash_2028);
+                totals.cash_2029 += parseNumber(row.cash_2029);
+                totals.cash_2030 += parseNumber(row.cash_2030);
+                totals.total_cash += parseNumber(row.total_cash);
+
+                totals.cost_2026 += parseNumber(row.cost_2026);
+                totals.cost_2027 += parseNumber(row.cost_2027);
+                totals.cost_2028 += parseNumber(row.cost_2028);
+                totals.cost_2029 += parseNumber(row.cost_2029);
+                totals.cost_2030 += parseNumber(row.cost_2030);
+                totals.total_cost += parseNumber(row.total_cost);
+            });
+
+            return [totals];
+        };
+
         const budgetDistributeMonthly = (budgetPerYear, year) => {
             let budgetPerMonth = 0;
             if(year < yearlyBudget && year >= data['start_year']) {
@@ -815,46 +899,72 @@ export default function Show() {
             });
         }
 
+        const updateTotalYearlyCostCash = () => {
+            const updatedTotals = calculateTotalBudget(api);
+            const gridApi = agGridRef.current.api;
+            // Update the Total row in the main grid
+            const pinnedRow = gridApi.getPinnedTopRow(0);
+            if (pinnedRow) {
+                pinnedRow.data = updatedTotals[0] // access the pinned row's data
+            }
+            api.forEachNode((node) => {
+                if (node.data.sap_code === 'Total') {
+                    api.applyTransaction({
+                        update: [{
+                            ...node.data,
+                            ...updatedTotals[0],
+                        }]
+                    });
+                }
+            });
+        }
+
 
         // Check if cash field changed
         if (/^cash_\d{4}$/.test(colDef.field)) {
             updateTotal("cash", "total_cash");
             updateCostMonthlyRemaining(data, colDef)
+            updateTotalYearlyCostCash()
+
+            api.refreshCells({ force: true });
         }
 
         if (/^cost_\d{4}$/.test(colDef.field)) {
             const budgetPerYear = data['budget_5yp'] / data['num_of_year_budget']
             const year = colDef.field.split("_")[1];
-            const type = colDef.field.split("_")[0];
 
             updateTotal("cost", "total_cost");
-            if(activeTab === 'Tab1'){
-                budgetDistributeMonthly(budgetPerYear, parseInt(year))
+
+            if (activeTab === 'Tab1') {
+                budgetDistributeMonthly(budgetPerYear, parseInt(year));
             }
-            updateCostMonthlyRemaining(data, colDef)
-            updateTotalMonthly('cost',year)
 
-            api.refreshCells({
-                rowNodes: [node],
-                force: true
-            });
+            updateCostMonthlyRemaining(data, colDef);
+            updateTotalMonthly('cost', year);
+            updateTotalYearlyCostCash()
 
+
+            // Refresh all cells (not just one node)
+            api.refreshCells({ force: true });
         }
 
         if(/^cost_(1[0-2]|[1-9])_\d{4}$/.test(colDef.field)) {
             replicateCostToCash(data, colDef)
             updateCostMonthlyRemaining(data, colDef)
             updateTotalMonthly('cost', colDef.field.split("_")[2])
+            calculateTotalBudget(data)
 
         }
 
         if(/^cash_(1[0-2]|[1-9])_\d{4}$/.test(colDef.field)) {
             updateCostMonthlyRemaining(data, colDef)
             updateTotalMonthly('cash',colDef.field.split("_")[2])
+            calculateTotalBudget(data)
         }
 
         if (colDef.field === 'budget_5yp' || colDef.field === 'budget_5yp_cost' || colDef.field === 'num_of_year_budget' || colDef.field === 'start_year') {
             budgetDistribute(data);
+            calculateTotalBudget(data)
         }
 
         /*if(colDef.field === 'total_cash'){
@@ -1067,6 +1177,7 @@ export default function Show() {
                             undoRedoCellEditingLimit={5}
                             onSelectionChanged={onSelectionChanged}
                             getRowId={params => params.data.id}
+                            pinnedTopRowData={calculateTotals(rowData)}
                         />
                     </div>
                 </CardWrapper>

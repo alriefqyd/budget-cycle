@@ -142,4 +142,13 @@
     font-weight: bold;
 }
 
+.ag-row-pinned {
+    background-color: rgba(137, 214, 197, 0.5) !important; /* Light blue or any color */
+    font-weight: bold;
+}
+
+.ag-center-cols-container .ag-row.ag-row-pinned.ag-row-top {
+    background-color: #e0ffe0 !important; /* Light green */
+}
+
 
