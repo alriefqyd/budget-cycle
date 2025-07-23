@@ -635,38 +635,30 @@ export default function Show() {
     };
 
     const calculateTotals = (rowData) => {
-        const totals = {
+        let totals = {
             sap_code: 'Total',
             title: '',
-            cash_2026: 0,
-            cash_2027: 0,
-            cash_2028: 0,
-            cash_2029: 0,
-            cash_2030: 0,
             total_cash:0,
-            cost_2026: 0,
-            cost_2027: 0,
-            cost_2028: 0,
-            cost_2029: 0,
-            cost_2030: 0,
-            total_cost:0,
+            total_cost:0
         };
+        for(let i = startYear; i< endYear + 1; i++){
+            const cashField = `cash_${i}`;
+            const costField = `cost_${i}`;
+            totals[cashField] = 0;
+            totals[costField] = 0;
+        }
 
         rowData.forEach(row => {
-            totals.cash_2026 += parseNumber(row.cash_2026);
-            totals.cash_2027 += parseNumber(row.cash_2027);
-            totals.cash_2028 += parseNumber(row.cash_2028);
-            totals.cash_2029 += parseNumber(row.cash_2029);
-            totals.cash_2030 += parseNumber(row.cash_2030);
+            for (let i = startYear; i <= endYear; i++) {
+                const cashField = `cash_${i}`;
+                const costField = `cost_${i}`;
+                totals[cashField] += parseNumber(row[cashField]);
+                totals[costField] += parseNumber(row[costField]);
+            }
             totals.total_cash += parseNumber(row.total_cash);
-            totals.cost_2026 += parseNumber(row.cost_2026);
-            totals.cost_2027 += parseNumber(row.cost_2027);
-            totals.cost_2028 += parseNumber(row.cost_2028);
-            totals.cost_2029 += parseNumber(row.cost_2029);
-            totals.cost_2030 += parseNumber(row.cost_2030);
             totals.total_cost += parseNumber(row.total_cost);
-            // Sum cost fields too
         });
+
         return [totals];
     };
 
@@ -715,36 +707,27 @@ export default function Show() {
             const totals = {
                 sap_code: 'Total',
                 title: '',
-                cash_2026: 0,
-                cash_2027: 0,
-                cash_2028: 0,
-                cash_2029: 0,
-                cash_2030: 0,
-                total_cash:0,
-                cost_2026: 0,
-                cost_2027: 0,
-                cost_2028: 0,
-                cost_2029: 0,
-                cost_2030: 0,
-                total_cost:0
+                total_cash: 0,
+                total_cost: 0,
             };
 
+            // Initialize dynamic year-based fields
+            for (let year = startYear; year <= endYear + 1; year++) {
+                totals[`cash_${year}`] = 0;
+                totals[`cost_${year}`] = 0;
+            }
+
+            // Sum values dynamically
             api.forEachNode((node) => {
                 const row = node.data;
                 if (row.sap_code === 'Total') return; // Skip total row
 
-                totals.cash_2026 += parseNumber(row.cash_2026);
-                totals.cash_2027 += parseNumber(row.cash_2027);
-                totals.cash_2028 += parseNumber(row.cash_2028);
-                totals.cash_2029 += parseNumber(row.cash_2029);
-                totals.cash_2030 += parseNumber(row.cash_2030);
-                totals.total_cash += parseNumber(row.total_cash);
+                for (let year = startYear; year <= endYear; year++) {
+                    totals[`cash_${year}`] += parseNumber(row[`cash_${year}`]);
+                    totals[`cost_${year}`] += parseNumber(row[`cost_${year}`]);
+                }
 
-                totals.cost_2026 += parseNumber(row.cost_2026);
-                totals.cost_2027 += parseNumber(row.cost_2027);
-                totals.cost_2028 += parseNumber(row.cost_2028);
-                totals.cost_2029 += parseNumber(row.cost_2029);
-                totals.cost_2030 += parseNumber(row.cost_2030);
+                totals.total_cash += parseNumber(row.total_cash);
                 totals.total_cost += parseNumber(row.total_cost);
             });
 

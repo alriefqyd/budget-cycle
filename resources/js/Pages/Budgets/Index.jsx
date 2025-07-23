@@ -114,7 +114,7 @@ export default function Dashboard() {
                                     <th className="px-4 py-3 text-center">Year</th>
                                     <th className="px-4 py-3 text-right">Cash Total</th>
                                     <th className="px-4 py-3 text-right">Cost Total</th>
-                                    <th className="px-4 py-3 text-right">Status (Approved / On Going With Version)</th>
+                                    <th className="px-4 py-3 text-right">Status</th>
                                     <th className="px-4 py-3 text-right">Version</th>
                                     <th className="px-4 py-3 text-center">
                                         Yearly Breakdown
