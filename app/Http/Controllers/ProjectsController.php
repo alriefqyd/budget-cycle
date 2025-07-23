@@ -24,7 +24,7 @@ use Mockery\Exception;
 class ProjectsController extends Controller
 {
     public function index(){
-        $projects = Projects::with('budgets')->get()->groupBy('year_period');
+        $projects = Projects::with(['budgets','cashCostYearlies'])->get()->groupBy('year_period');
         $projects = $projects->map(function ($group) {
             return $group->values(); // ensure inner collections are clean arrays
         });
