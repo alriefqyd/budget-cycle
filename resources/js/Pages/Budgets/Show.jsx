@@ -119,6 +119,18 @@ export default function Show() {
                         rowNodes: [rowNode],
                         columns: Object.keys(updatedRow),
                     });
+
+                    const displayedRows = [];
+                    agGridApi.forEachNodeAfterFilterAndSort((node) => {
+                        displayedRows.push(node.data);
+                    });
+
+                    const updatedTotals = calculateTotals(displayedRows);
+
+                    const pinnedRow = agGridApi.getPinnedTopRow(0);
+                    if (pinnedRow) {
+                        pinnedRow.setData(updatedTotals[0]);
+                    }
                 }
             });
 
@@ -565,7 +577,7 @@ export default function Show() {
                 newRow[`cash_${i}_${year}`] = 0;
             }
         }
-        
+
         setRowData(prev => ({
             ...prev,
             data: newRow
@@ -917,6 +929,7 @@ export default function Show() {
                     });
                 }
             });
+
         }
 
 
