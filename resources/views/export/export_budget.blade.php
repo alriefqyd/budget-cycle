@@ -1,107 +1,102 @@
 <table border="1" cellspacing="0" cellpadding="5">
     <thead>
     <tr>
-        <th rowspan="2">ID</th>
-        <th rowspan="2">SAP Code</th>
-        <th rowspan="2">Project´s Title</th>
-        <th rowspan="2">Note</th>
-        <th rowspan="2">ongoing/new</th>
-        <th rowspan="2">PM</th>
-        <th rowspan="2">PC</th>
-        <th rowspan="2">Directorate</th>
-        <th rowspan="2">Owner Area</th>
-        <th rowspan="2">Type of Investment</th>
-        <th rowspan="2">Category</th>
-        <th rowspan="2">Risk Residual</th>
-        <th rowspan="2">Risk Forecast</th>
-        <th rowspan="2">BC Budget</th>
-        <th rowspan="2">Approved Budget</th>
-        <th colspan="2">Actual Up to 2024</th>
-        <th colspan="2">A/F 2025</th>
-        <th colspan="2">Budget 5YP</th>
-        <th rowspan="2">Start year</th>
-        <th rowspan="2">Budget Year 1/2/3/4/5</th>
-        <th rowspan="2">Fund</th>
-        <th rowspan="2">Cost 2026 (USD)</th>
-        <th rowspan="2">Cost 2027 (USD)</th>
-        <th rowspan="2">Cost 2028 (USD)</th>
-        <th rowspan="2">Cost 2029 (USD)</th>
-        <th rowspan="2">Cost 2030 (USD)</th>
-        <th rowspan="2">Cost 2026-2030 (USD)</th>
-        <th rowspan="2">Cash 2026 (USD)</th>
-        <th rowspan="2">Cash 2027 (USD)</th>
-        <th rowspan="2">Cash 2028 (USD)</th>
-        <th rowspan="2">Cash 2029</th>
-        <th rowspan="2">Cash 2030</th>
-        <th rowspan="2">Cash 2026-2030 (USD)</th>
+        <th>ID</th>
+        <th>SAP Code</th>
+        <th>Project´s Title</th>
+        <th>Note</th>
+        <th>ongoing/new</th>
+        <th>PM</th>
+        <th>PC</th>
+        <th>Directorate</th>
+        <th>Owner Area</th>
+        <th>Type of Investment</th>
+        <th>Category</th>
+        <th>Risk Residual</th>
+        <th>Risk Forecast</th>
+        <th>BC Budget</th>
+        <th>Approved Budget</th>
+        <th>Actual Up to 2024 Cost</th>
+        <th>Actual Up to 2024Cash</th>
+        <th>A/F 2025 Cost</th>
+        <th>A/F 2025Cash</th>
+        <th>Budget 5YP Cost</th>
+        <th>Budget 5YP Cash</th>
+        <th>Start year</th>
+        <th>Budget Year 1/2/3/4/5</th>
+        <th>Fund</th>
+        <th>Cost 2026 (USD)</th>
+        <th>Cost 2027 (USD)</th>
+        <th>Cost 2028 (USD)</th>
+        <th>Cost 2029 (USD)</th>
+        <th>Cost 2030 (USD)</th>
+        <th>Cost 2026-2030 (USD)</th>
+        <th>Cash 2026 (USD)</th>
+        <th>Cash 2027 (USD)</th>
+        <th>Cash 2028 (USD)</th>
+        <th>Cash 2029</th>
+        <th>Cash 2030</th>
+        <th>Cash 2026-2030 (USD)</th>
 
         <!-- Monthly Forecast Cost 2025 -->
-        <th rowspan="2">Jan-26 Cost</th>
-        <th rowspan="2">Feb-27 Cost</th>
-        <th rowspan="2">Mar-28 Cost</th>
-        <th rowspan="2">Apr-29 Cost</th>
-        <th rowspan="2">May-30 Cost</th>
-        <th rowspan="2">Jun-31 Cost</th>
-        <th rowspan="2">Jul-32 Cost</th>
-        <th rowspan="2">Aug-33 Cost</th>
-        <th rowspan="2">Sep-34 Cost</th>
-        <th rowspan="2">Oct-35 Cost</th>
-        <th rowspan="2">Nov-36 Cost</th>
-        <th rowspan="2">Dec-37 Cost</th>
-        <th rowspan="2">Total 2026 Cost</th>
+        <th>Jan-26 Cost</th>
+        <th>Feb-27 Cost</th>
+        <th>Mar-28 Cost</th>
+        <th>Apr-29 Cost</th>
+        <th>May-30 Cost</th>
+        <th>Jun-31 Cost</th>
+        <th>Jul-32 Cost</th>
+        <th>Aug-33 Cost</th>
+        <th>Sep-34 Cost</th>
+        <th>Oct-35 Cost</th>
+        <th>Nov-36 Cost</th>
+        <th>Dec-37 Cost</th>
+        <th>Total 2026 Cost</th>
 
         <!-- Monthly Forecast Cash 2025 -->
-        <th rowspan="2">Jan-26 Cash</th>
-        <th rowspan="2">Feb-26 Cash</th>
-        <th rowspan="2">Mar-26 Cash</th>
-        <th rowspan="2">Apr-26 Cash</th>
-        <th rowspan="2">May-26 Cash</th>
-        <th rowspan="2">Jun-26 Cash</th>
-        <th rowspan="2">Jul-26 Cash</th>
-        <th rowspan="2">Aug-26 Cash</th>
-        <th rowspan="2">Sep-26 Cash</th>
-        <th rowspan="2">Oct-26 Cash</th>
-        <th rowspan="2">Nov-26 Cash</th>
-        <th rowspan="2">Dec-26 Cash</th>
-        <th rowspan="2">Total 2026 Cash</th>
+        <th>Jan-26 Cash</th>
+        <th>Feb-26 Cash</th>
+        <th>Mar-26 Cash</th>
+        <th>Apr-26 Cash</th>
+        <th>May-26 Cash</th>
+        <th>Jun-26 Cash</th>
+        <th>Jul-26 Cash</th>
+        <th>Aug-26 Cash</th>
+        <th>Sep-26 Cash</th>
+        <th>Oct-26 Cash</th>
+        <th>Nov-26 Cash</th>
+        <th>Dec-26 Cash</th>
+        <th>Total 2026 Cash</th>
 
         <!-- Monthly Forecast Cost 2026 -->
-        <th rowspan="2">Jan-27 Cost</th>
-        <th rowspan="2">Feb-27 Cost</th>
-        <th rowspan="2">Mar-27 Cost</th>
-        <th rowspan="2">Apr-27 Cost</th>
-        <th rowspan="2">May-27 Cost</th>
-        <th rowspan="2">Jun-27 Cost</th>
-        <th rowspan="2">Jul-27 Cost</th>
-        <th rowspan="2">Aug-27 Cost</th>
-        <th rowspan="2">Sep-27 Cost</th>
-        <th rowspan="2">Oct-27 Cost</th>
-        <th rowspan="2">Nov-27 Cost</th>
-        <th rowspan="2">Dec-27 Cost</th>
-        <th rowspan="2">Total 2027 Cost</th>
+        <th>Jan-27 Cost</th>
+        <th>Feb-27 Cost</th>
+        <th>Mar-27 Cost</th>
+        <th>Apr-27 Cost</th>
+        <th>May-27 Cost</th>
+        <th>Jun-27 Cost</th>
+        <th>Jul-27 Cost</th>
+        <th>Aug-27 Cost</th>
+        <th>Sep-27 Cost</th>
+        <th>Oct-27 Cost</th>
+        <th>Nov-27 Cost</th>
+        <th>Dec-27 Cost</th>
+        <th>Total 2027 Cost</th>
 
         <!-- Monthly Forecast Cash 2026 -->
-        <th rowspan="2">Jan-27 Cash</th>
-        <th rowspan="2">Feb-27 Cash</th>
-        <th rowspan="2">Mar-27 Cash</th>
-        <th rowspan="2">Apr-27 Cash</th>
-        <th rowspan="2">May-27 Cash</th>
-        <th rowspan="2">Jun-27 Cash</th>
-        <th rowspan="2">Jul-27 Cash</th>
-        <th rowspan="2">Aug-27 Cash</th>
-        <th rowspan="2">Sep-27 Cash</th>
-        <th rowspan="2">Oct-27 Cash</th>
-        <th rowspan="2">Nov-27 Cash</th>
-        <th rowspan="2">Dec-27 Cash</th>
-        <th rowspan="2">Total 2027 Cash</th>
-    </tr>
-    <tr>
-        <th>Cost</th>
-        <th>Cash</th>
-        <th>Cost</th>
-        <th>Cash</th>
-        <th>Cost</th>
-        <th>Cash</th>
+        <th>Jan-27 Cash</th>
+        <th>Feb-27 Cash</th>
+        <th>Mar-27 Cash</th>
+        <th>Apr-27 Cash</th>
+        <th>May-27 Cash</th>
+        <th>Jun-27 Cash</th>
+        <th>Jul-27 Cash</th>
+        <th>Aug-27 Cash</th>
+        <th>Sep-27 Cash</th>
+        <th>Oct-27 Cash</th>
+        <th>Nov-27 Cash</th>
+        <th>Dec-27 Cash</th>
+        <th>Total 2027 Cash</th>
     </tr>
     </thead>
     <tbody>
