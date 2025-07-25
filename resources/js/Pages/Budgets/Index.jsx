@@ -12,17 +12,19 @@ import axios from "axios";
 
 export default function Dashboard() {
     const { projects } = usePage().props;
+    const [projectState, setProjectState] = useState(projects);
     const [modalType, setModalType] = useState('excel')
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
     const [shouldReload, setShouldReload] = useState(false);
 
     useEffect(() => {
-        if(shouldReload) {
-            router.reload({ only: ['projects'] });
-            setShouldReload(false);
-        }
-    },[shouldReload])
+        const channel = window.Echo.channel('budgetList')
+            .listen('.budgetList.update', (event) => {
+                const newData = event.data;
+                setProjectState(newData);
+            })
+    },[])
     const handleUpload = async (data) => {
         setLoading(true);  // start loading
         const formData = new FormData();
@@ -122,12 +124,12 @@ export default function Dashboard() {
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 bg-white">
-                                {Object.entries(projects).map(([groupKey, groupItems]) => (
+                                {projectState.map((project, index) => (
                                     <RowTable
-                                        key={groupKey}
-                                        budget={groupKey}
-                                        item={groupItems}
-                                        url={`/budgets/${groupKey}`}
+                                        key={index}
+                                        budget={`${project.start_year}`}
+                                        item={project}
+                                        url={`/budgets/${project.start_year}`}
                                     />
                                 ))}
                                 </tbody>

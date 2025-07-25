@@ -21,6 +21,11 @@ class HomeController extends Controller
     public function getCashCostYearly($startYear)
     {
         $data = collect();
+        $planArr = [];
+        $totalPlan5yp = [];
+        $totalApprove5yp = [];
+        $approvedArr = [];
+        $label = [];
         $lastYear = [200281789,194704553,178882078,104596538,0];
         foreach (range($startYear, $startYear + 4) as $index => $year) {
             $cashPlan = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
@@ -36,12 +41,15 @@ class HomeController extends Controller
             $plan = $cashPlan ? round($cashPlan / 1000000, 2) : 0;
             $approved = $lastYear[$index] ? round($lastYear[$index] / 1000000, 2) : 0;
 
-            $data->push([
-                'year' => (string) $year,
-                'approved' => $approved,
-                'plan' => $plan,
-            ]);
+            array_push($label, $year);
+            array_push($planArr, $plan);
+            array_push($approvedArr, $approved);
+            array_push($totalPlan5yp, null);
+            array_push($totalApprove5yp, null);
         }
+
+        array_push($planArr,null);
+        array_push($approvedArr, null);
 
 
         // counting cash 5YP
@@ -60,20 +68,19 @@ class HomeController extends Controller
         $cash5yp = $cash5yp ? round($cash5yp / 1000000, 2) : 0;
         $cost5yp = $cost5yp ? round($cost5yp / 1000000, 2) : 0; */
 
-        $approved5yp = $data->reduce(function ($carry, $item) {
-            return $carry + $item['approved'];
-        });
+        $plan5yp = array_sum($planArr);
+        $approve5yp = array_sum($approvedArr);
 
-        $plan5yp = $data->reduce(function ($carry, $item) {
-            return $carry + $item['plan'];
-        });
+        array_push($totalApprove5yp,$approve5yp);
+        array_push($totalPlan5yp,$plan5yp);
+        array_push($label, '5YP');
 
-        $data->push([
-            'year' => '5YP',
-            'totalApproved' => $approved5yp,
-            'totalPlan' => round($plan5yp,2),
-        ]);
-
-        return $data;
+        return [
+            'label' => $label,
+            'approved' => $approvedArr,
+            'plan' => $planArr,
+            'approved5yp' => $totalApprove5yp,
+            'plan5yp' => $totalPlan5yp,
+        ];
     }
 }

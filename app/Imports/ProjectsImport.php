@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Events\BudgetListUpdated;
 use App\Models\BudgetSetting;
 use App\Models\CashCostYearly;
 use App\Models\project;
@@ -113,6 +114,8 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             'cost_fifth',
         ];
 
+        $projectService = new ProjectsService;
+        $data = $projectService->getDataProjectIndex();
         $project = null;
         // Mark SAP code as imported
         $this->uniqueIdentifiers[] = $row['sap_code'];
@@ -226,6 +229,9 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
 
     public static function afterImport(AfterImport $event){
         Log::info('AfterImport event fired');
+        $projectService = new ProjectsService();
+        $data = $projectService->getDataProjectIndex();
+        broadcast(new BudgetListUpdated($data->toArray()));
 //        $importInstance = $event->getConcernable();
 //        Projects::whereNotIn('sap_code', $importInstance->uniqueIdentifiers)->delete();
     }

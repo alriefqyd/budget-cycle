@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\ApprovalStatus;
+use App\Events\BudgetListUpdated;
 use App\Events\BudgetUpdated;
 use App\Http\Controllers\HomeController;
 use App\Models\BudgetCyclePeriod;
@@ -10,9 +11,68 @@ use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
+use Illuminate\Support\Facades\Log;
 
 class ProjectsService
 {
+    public function getDataProjectIndex()
+    {
+        $projects = Projects::with(['budgets','cashCostYearlies'])->get();
+
+        // Group by year_period
+        $grouped = $projects->groupBy('year_period');
+
+        // Transform each group
+        $results = $grouped->map(function ($group, $year_period) {
+            $start_year = (int) $year_period;
+            $end_year = $start_year + 4;
+
+            // Flatten all cashCostYearlies from the group
+            $allYearly = $group->flatMap(function ($project) {
+                return $project->cashCostYearlies;
+            });
+
+            // Total cost
+            $total_cost = $allYearly->where('type', 'cost')->sum(function ($item) {
+                return (float)$item->amount;
+            });
+
+            // Total cash
+            $total_cash = $allYearly->where('type', 'cash')->sum(function ($item) {
+                return (float)$item->amount;
+            });
+
+
+            // Build yearly summary from start_year to end_year
+            $costCashYearlies = collect();
+            for ($year = $start_year; $year <= $end_year; $year++) {
+                foreach (['cost', 'cash'] as $type) {
+                    $amount = $allYearly
+                        ->where('year', (string)$year)
+                        ->where('type', $type)
+                        ->sum(function ($item) {
+                            return (float)$item->amount;
+                        });
+
+                    $costCashYearlies->push((object)[
+                        'year' => $year,
+                        'type' => $type,
+                        'amount' => $amount
+                    ]);
+                }
+            }
+
+            return (object)[
+                'start_year' => $start_year,
+                'end_year' => $end_year,
+                'total_cost' => $total_cost,
+                'total_cash' => $total_cash,
+                'costCashYearlies' => $costCashYearlies
+            ];
+        });
+
+        return $results->values(); // optional: reset keys
+    }
     public function saveProject($request, $budgetCyclePeriod){
         $data = Projects::create([
             'project_title' => $request->project_title,
@@ -165,15 +225,37 @@ class ProjectsService
         return $budgets;
     }
 
-    public function updateChart(){
+    public function getBudgetCostCashByStartYear($year){
+        $project = Projects::with(['budgets','cashCostYearlies'])->where('year_period', $year)->get();
+        $budget = [];
+        $a = $project->map(function ($project) use (&$budget) {
+            foreach($project->cashCostYearlies as $item){
+                $arr = [
+                    'project_id' => $project->id,
+                    'year' => $item->year,
+                    'amount' => $item->amount,
+                    'type' => $item->type,
+                ];
+                array_push($budget, $arr);
+            }
+            return $budget;
+        });
+    }
+
+    public function updateChart($year){
         $homeController = new HomeController();
-        $year = date('Y');
         $dataChart = $homeController->getCashCostYearly($year);
-        broadcast(new \App\Events\DashboardUpdated($dataChart->toArray()));
+        broadcast(new \App\Events\DashboardUpdated($dataChart));
     }
 
     public function updateBudgets($year, $id){
         broadcast(new BudgetUpdated($this->getBudgetsByYear($year, $id)));
+    }
+
+    public function updateBudgetList($year){
+        $projectService = new ProjectsService();
+        $data = $projectService->getDataProjectIndex();
+        broadcast(new BudgetListUpdated($data->toArray()));
     }
 
 }

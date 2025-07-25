@@ -597,6 +597,7 @@ export default function Show() {
             return false;
         }
 
+        console.log(duplicatedRows)
         const response = await fetch('/budgets/duplicate', {
             method: 'POST',
             headers: {
@@ -648,7 +649,13 @@ export default function Show() {
             totals[costField] = 0;
         }
 
-        rowData.forEach(row => {
+        const arrayData = Array.isArray(rowData)
+            ? rowData
+            : Object.keys(rowData)
+                .filter(key => !isNaN(key)) // only numeric keys
+                .map(key => rowData[key]);
+
+        arrayData.forEach(row => {
             for (let i = startYear; i <= endYear; i++) {
                 const cashField = `cash_${i}`;
                 const costField = `cost_${i}`;
@@ -658,6 +665,8 @@ export default function Show() {
             totals.total_cash += parseNumber(row.total_cash);
             totals.total_cost += parseNumber(row.total_cost);
         });
+
+
 
         return [totals];
     };

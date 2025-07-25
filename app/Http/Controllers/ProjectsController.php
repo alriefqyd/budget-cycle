@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\ApprovalStatus;
+use App\Events\BudgetListUpdated;
 use App\Events\BudgetUpdated;
 use App\Exports\BudgetCyclePlanExport;
 use App\Imports\MaterialCategoryImport;
@@ -24,10 +25,8 @@ use Mockery\Exception;
 class ProjectsController extends Controller
 {
     public function index(){
-        $projects = Projects::with(['budgets','cashCostYearlies'])->get()->groupBy('year_period');
-        $projects = $projects->map(function ($group) {
-            return $group->values(); // ensure inner collections are clean arrays
-        });
+        $projectService = new ProjectsService();
+        $projects = $projectService->getDataProjectIndex();
         return Inertia::render('Budgets/Index', [
             'projects' => $projects
         ]);
@@ -54,7 +53,7 @@ class ProjectsController extends Controller
 
             DB::commit();
             /** Websocket */
-            $projectService->updateChart();
+            $projectService->updateChart($request->year_period);
             $projectService->updateBudgets($request->year_period, $data->id);
             return response()->json([
                 'success' => true,
@@ -75,17 +74,21 @@ class ProjectsController extends Controller
         DB::beginTransaction();
         try {
             $projectService = new ProjectsService();
+            $currentProject = $projectService->getDataProjectIndex();
             $projectList = collect();
+            $year = $request->year_period ?? date('Y');
             foreach ($request->all() as $budget) {
                 $data = (object) $budget;
-                $project = $projectService->saveProject($data);
+                $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
+                $project = $projectService->saveProject($data, $budgetCycle);
                 $projectList->push($project);
                 $budgetSetting = $projectService->saveBudget($project, $data);
                 $cashCostYearly = $projectService->saveCashCostYearly($project, $data);
                 broadcast(new BudgetUpdated($project->toArray()));
+                broadcast(new BudgetListUpdated($currentProject->toArray()));
             }
             DB::commit();
-            $projectService->updateChart();
+            $projectService->updateChart($year);
             return response()->json([
                 'success' => true,
                 'message' => 'Budget duplicate successfully',
@@ -102,6 +105,8 @@ class ProjectsController extends Controller
     }
 
     public function upload(Request $request){
+        $projectService = new ProjectsService();
+        $data = $projectService->getDataProjectIndex();
         $file = $request->file('file');
         if ($request->hasFile('file')) {
             Log::info('Starting import projects...');
@@ -136,6 +141,7 @@ class ProjectsController extends Controller
 
     public function uploadProject(Request $request){
         $file = $request->file('file');
+
         if ($request->hasFile('file')) {
             Log::info('Starting import projects...');
             try {
@@ -250,8 +256,9 @@ class ProjectsController extends Controller
             }
 
             DB::commit();
-            $projectService->updateChart();
+            $projectService->updateChart($request->year_period);
             $projectService->updateBudgets($request->year_period, $id);
+            $projectService->updateBudgetList($request->year_period);
             return response()->json([
                 'success' => true,
                 'message' => 'Budget updated successfully',

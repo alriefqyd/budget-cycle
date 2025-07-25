@@ -5,168 +5,166 @@ import CardWrapper from "@/Components/CardWrapper.jsx";
 import ContainerWrapper from "@/Components/ContainerWrapper.jsx";
 import { AgCharts } from 'ag-charts-react';
 import {useEffect, useState} from "react";
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import ChartDataLabels from 'chartjs-plugin-datalabels'; // for module use
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
+
 
 export default function Dashboard() {
     const { dataChart } = usePage().props
-    const [chartOptions, setChartOptions] = useState({
-        data: dataChart,
-        title: {
-            text: '5YP 2026–2030 Sustaining Investment Highlights (Cash in million)',
-            fontSize: 16,
-        },
-        series: [
-            {
-                barPadding: 0,
-                type: 'bar',
-                xKey: 'year',
-                yKey: 'plan',
-                barGap: 0,       // removes gap between bars within one group
-                barGrouping: true, // ensures grouping is enabled
-                yName: 'Plan 2026–2030',
-                fill: '#007B82',
-                grouped: true,
-                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
-                paddingOuter: 0.05, // optional; less gap on edges
-                label: {
-                    enabled: true,
-                    placement: 'outside',
-                    fontWeight: 'bold',
-                    fontSize: 12,
-                    color: '#fff',
-                    formatter: ({ value }) => `${value ?? ''}`,
-                },
-            },
-            // APPROVED per year
-            {
-                type: 'bar',
-                xKey: 'year',
-                yKey: 'approved',
-                yName: 'Approved 2025–2029',
-                fill: '#F4B740',
-                barGap: 0,       // removes gap between bars within one group
-                barGrouping: true, // ensures grouping is enabled
-                grouped: true,
-                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
-                paddingOuter: 0.05, // optional; less gap on edges
-                label: {
-                    enabled: true,
-                    placement: 'outside',
-                    fontWeight: 'bold',
-                    fontSize: 12,
-                    color: '#fff',
-                    formatter: ({ value }) => `${value ?? ''}`,
-                },
-            },
-            // 5YP PLAN – plotted on secondary axis
-            {
-                type: 'bar',
-                xKey: 'year',
-                yKey: 'totalPlan',
-                yName: '5YP Plan Total',
-                fill: '#2f74b4',
-                barGap: 0,       // removes gap between bars within one group
-                barGrouping: true, // ensures grouping is enabled
-                grouped: true,
-                stacked: false,
-                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
-                paddingOuter: 0.05, // optional; less gap on edges
-                yAxisKey: 'rightAxis',
-                label: {
-                    enabled: true,
-                    placement: 'outside',
-                    fontWeight: 'bold',
-                    fontSize: 12,
-                    color: '#fff',
-                    formatter: ({ value }) => `${value ?? ''}`,
-                },
-            },
-            // 5YP APPROVED – plotted on secondary axis
-            {
-                type: 'bar',
-                xKey: 'year',
-                yKey: 'totalApproved',
-                yName: '5YP Approved Total',
-                barGap: 0,       // removes gap between bars within one group
-                barGrouping: true, // ensures grouping is enabled
-                fill: '#91ce4f',
-                grouped: true,
-                stacked: false,
-                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
-                paddingOuter: 0.05, // optional; less gap on edges
-                yAxisKey: 'rightAxis',
-                label: {
-                    enabled: true,
-                    placement: 'outside',
-                    fontWeight: 'bold',
-                    fontSize: 12,
-                    color: '#fff',
-                    formatter: ({ value }) => `${value ?? ''}`,
-                },
-            },
-        ],
-        axes: [
-            {
-                type: 'category',
-                position: 'bottom',
-                title: { text: 'Year' },
-                paddingInner: 0.1,     // controls space between year groups
-                paddingOuter: 0.05,    // optional: space at left/right ends
-            },
-            {
-                type: 'number',
-                position: 'left',
-                title: { text: 'Investment' },
-                keys: ['plan', 'approved'],
-                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
-                paddingOuter: 0.05, // optional; less gap on edges
-            },
-            {
-                type: 'number',
-                position: 'right',
-                title: { text: '5YP Total' },
-                keys: ['totalPlan', 'totalApproved'],
-                paddingInner: 0.1,  // adjust between 0.05 - 0.2 for tighter center alignment
-                paddingOuter: 0.05, // optional; less gap on edges
-            },
-        ],
-        legend: { position: 'bottom' },
-    });
+    const [dataChartDashboard, setDataChartDashboard] = useState(dataChart)
+    const roundUp = (value, multiple) => Math.ceil(value / multiple) * multiple;
+    const maxPlanAxisLeft = roundUp(Math.max(...dataChartDashboard.approved, ...dataChartDashboard.plan) + 20, 1);
+    const maxPlanAxisRight = roundUp(Math.max(...dataChartDashboard.approved5yp, ...dataChartDashboard.plan5yp) + 20, 1);
 
+    const data = {
+        labels: dataChartDashboard.label,
+        datasets: [
+            // Plan (2026–2030) - Left Axis
+            {
+                label: 'Plan',
+                data: dataChartDashboard.plan,
+                borderColor: 'green',
+                backgroundColor: '#009199',
+                yAxisID: 'approvedAxis',
+                barThickness: 52,
+            },
+            // Approved (2026–2030) - Left Axis
+            {
+                label: 'Approved',
+                data: dataChartDashboard.approved,
+                borderColor: 'blue',
+                backgroundColor: '#e9b733',
+                yAxisID: 'approvedAxis',
+                barThickness: 50,
+            },
+            // Plan (5YP) - Right Axis
+            {
+                label: 'Plan (5YP)',
+                skipLegend: true,
+                data: dataChartDashboard.plan5yp,
+                borderColor: 'lightgreen',
+                backgroundColor: '#009199',
+                yAxisID: 'planAxis',
+                barThickness: 50,
+
+            },
+            // Approved (5YP) - Right Axis
+            {
+                label: 'Approved (5YP)',
+                skipLegend: true,
+                data: dataChartDashboard.approved5yp,
+                borderColor: 'lightblue',
+                backgroundColor: '#e9b733',
+                yAxisID: 'planAxis',
+                barThickness: 52,
+            },
+        ]
+    };
+
+
+    const options = {
+        responsive: true,
+        plugins: {
+            title: {
+                display: true,
+                text: '5YP 2026–2030 Sustaining Investment Highlights',
+                font: {
+                    size: 16,
+                },
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+            },
+            legend: {
+                position: 'top',
+                labels: {
+                    generateLabels: function (chart) {
+                        return chart.data.datasets
+                            .filter(ds => !ds.skipLegend) // ⬅️ filter out datasets with skipLegend
+                            .map((dataset, i) => {
+                                return {
+                                    text: dataset.label,
+                                    fillStyle: dataset.backgroundColor,
+                                    hidden: !chart.isDatasetVisible(i),
+                                    datasetIndex: i
+                                }
+                            });
+                    }
+                }
+            },
+            datalabels: {
+                anchor: 'end',
+                align: 'start',
+                offset: -20,
+                color: 'black',
+                font: {
+                    weight: 'bold',
+                    size: 12,
+
+                },
+                formatter: function (value) {
+                    return value?.toLocaleString(); // Adds commas
+                },
+            },
+        },
+        interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false,
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Year',
+                },
+                categoryPercentage: 0.8,
+                barPercentage: 0.9
+            },
+            approvedAxis: {
+                type: 'linear',
+                position: 'left',
+                beginAtZero: true,
+                max: maxPlanAxisLeft,
+                title: {
+                    display: true,
+                    text: 'Investment',
+                },
+
+            },
+            planAxis: {
+                type: 'linear',
+                position: 'right',
+                beginAtZero: true,
+                max: maxPlanAxisRight,
+                title: {
+                    display: true,
+                    text: '5YP Total',
+                },
+                grid: {
+                    drawOnChartArea: false,
+                },
+            },
+        },
+
+    };
 
     // this will update data chart if broadcast exist
     useEffect(() => {
         const channel = window.Echo.channel('dashboard')
             .listen('.dashboard.update', (event) => {
                 const newData = event.data;
-                // 🔍 Compare with old data
-                const deltas = newData.map((newItem, index) => {
-                    const oldItem = chartOptions.data[index] || {};
-                    return {
-                        year: newItem.year,
-                        approvedDelta: newItem.approved * 1000000 - (oldItem.approved * 1000000 || 0),
-                        planDelta: newItem.plan * 100000 - (oldItem.plan * 1000000 || 0),
-                    };
-                });
-
-                console.log(newData)
-                // console.log('🔼 Changes:', deltas);
-
-                // 🟢 Optionally show toast/indicator here
-                deltas.forEach(d => {
-                    if (d.approvedDelta !== 0 || d.planDelta !== 0) {
-                        // console.log(d);
-                        // console.log(`Year ${d.year}: Approved +${d.approvedDelta}, Plan +${d.planDelta}`);
-                    }
-                });
-
-                // 🎯 Update chart data
-                setChartOptions(prev => ({
-                    ...prev,
-                    data: newData,
-                }));
+                setDataChartDashboard(newData);
             });
-    }, []);
 
+        return () => {
+            window.Echo.leave('dashboard');
+        };
+    }, []);
 
     return (
         <AuthenticatedLayout
@@ -188,7 +186,7 @@ export default function Dashboard() {
                                 </p>
                             </div>
                         </div>
-                        <AgCharts options={chartOptions} className="p-3" style={{height: "calc(100vh - 150px)", width: "100%"}}/>
+                        <Bar options={options} data={data}/>
                     </div>
                 </div>
                 {/* Income and Loss Cards */}
