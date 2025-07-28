@@ -110,8 +110,8 @@ class ProjectsController extends Controller
         $file = $request->file('file');
         if ($request->hasFile('file')) {
             Log::info('Starting import projects...');
-
             try {
+                $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
                 Excel::import(new ProjectsImport($request->year, false), $file);
                 Log::info('Import project successful');
                 return response()->json(['message' => 'Import Successful']);
@@ -172,6 +172,7 @@ class ProjectsController extends Controller
                 'start_year' => $request->year,
                 'budget_cycle_id' => $budgetCyclePeriod->id,
             ]);
+            $projectService->updateBudgetList($request->year);
             return response()->json(['message' => 'Save Successful']);
         } catch (\Exception $e) {
             DB::rollback();

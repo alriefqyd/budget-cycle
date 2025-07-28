@@ -1,5 +1,5 @@
 import {useEffect, useState, useRef, useMemo} from "react"
-import { usePage } from "@inertiajs/react"
+import {Link, usePage} from "@inertiajs/react"
 import { AgGridReact } from "ag-grid-react"
 import "../../../css/ag-grid-custom.css";
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -1076,21 +1076,23 @@ export default function Show() {
             <ContainerWrapper>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => window.history.back()}
-                            className="inline-flex items-center px-2 py-2 bg-red-600 text-white text-sm font-medium rounded-lg shadow hover:bg-red-700 transition"
-                        >
-                            <svg
-                                className="w-5 h-5 mr-2"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                                viewBox="0 0 24 24"
+                        <Link href={'/budgets'}>
+                            <button
+                                className="inline-flex items-center px-2 py-2 bg-red-600 text-white text-sm font-medium rounded-lg shadow hover:bg-red-700 transition"
                             >
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
-                            </svg>
-                            Back
-                        </button>
+                                <svg
+                                    className="w-5 h-5 mr-2"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+                                </svg>
+                                Back
+                            </button>
+                        </Link>
+
                     </div>
 
                     <div className="flex gap-2">

@@ -114,8 +114,6 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             'cost_fifth',
         ];
 
-        $projectService = new ProjectsService;
-        $data = $projectService->getDataProjectIndex();
         $project = null;
         // Mark SAP code as imported
         $this->uniqueIdentifiers[] = $row['sap_code'];
@@ -223,7 +221,9 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             );
 
             $projectService = new ProjectsService();
-            $projectService->updateBudgets($this->year, $project->id);
+            if($this->isBudgetCycle){
+                $projectService->updateBudgets($this->year, $project->id);
+            }
         }
     }
 
@@ -232,8 +232,8 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         $projectService = new ProjectsService();
         $data = $projectService->getDataProjectIndex();
         broadcast(new BudgetListUpdated($data->toArray()));
-//        $importInstance = $event->getConcernable();
-//        Projects::whereNotIn('sap_code', $importInstance->uniqueIdentifiers)->delete();
+        //  $importInstance = $event->getConcernable();
+        //  Projects::whereNotIn('sap_code', $importInstance->uniqueIdentifiers)->delete();
     }
 
 //    public function registerEvents(): array

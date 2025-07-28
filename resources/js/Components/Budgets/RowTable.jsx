@@ -1,4 +1,4 @@
-import {usePage} from "@inertiajs/react";
+import {router, usePage} from "@inertiajs/react";
 import {useEffect} from "react";
 
 export default function RowTable(props) {
@@ -17,7 +17,7 @@ export default function RowTable(props) {
     });
 
     return (
-        <tr key={props.budget.id} onClick={() => window.location.href = props.url} className="odd:bg-white cursor-pointer even:bg-gray-50 hover:bg-yellow-50 transition duration-150">
+        <tr key={props.budget.id}  onClick={() => router.visit(props.url)} className="odd:bg-white cursor-pointer even:bg-gray-50 hover:bg-yellow-50 transition duration-150">
             <td className="px-4 py-3 text-center font-medium">{budget} - {parseInt(budget) + 4}</td>
             <td className="px-4 py-3 text-right font-semibold">$ {item.total_cash.toLocaleString()}</td>
             <td className="px-4 py-3 text-right font-semibold">$ {item.total_cost.toLocaleString()}</td>
