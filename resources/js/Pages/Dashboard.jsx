@@ -70,7 +70,7 @@ export default function Dashboard() {
         plugins: {
             title: {
                 display: true,
-                text: '5YP 2026–2030 Sustaining Investment Highlights',
+                text: '5YP 2026–2030 Sustaining Investment Highlights (Cash in million)',
                 font: {
                     size: 16,
                 },
