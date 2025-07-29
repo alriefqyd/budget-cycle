@@ -22,7 +22,10 @@ Route::post('/export/budgets', [\App\Http\Controllers\ProjectsController::class,
 Route::post('/budgets/import-project', [\App\Http\Controllers\ProjectsController::class, 'uploadProject'])->middleware(['auth'])->name('budget-upload-detail');
 Route::post('/budgets/create', [\App\Http\Controllers\ProjectsController::class, 'create'])->middleware(['auth'])->name('budget-upload');
 Route::put('/budgets/{id}', [\App\Http\Controllers\ProjectsController::class, 'update'])->middleware(['auth'])->name('budget-update');
+Route::put('/budgets/{id}', [\App\Http\Controllers\ProjectsController::class, 'update'])->middleware(['auth'])->name('budget-update');
+Route::put('/budgets-finalize/{year}', [\App\Http\Controllers\ProjectsController::class, 'finalize'])->middleware(['auth'])->name('budget-update');
 Route::post('/budgets/', [\App\Http\Controllers\ProjectsController::class, 'store'])->middleware(['auth'])->name('budget-create');
+Route::delete('/budgets', [\App\Http\Controllers\ProjectsController::class, 'destroy'])->middleware(['auth'])->name('budget-delete');
 Route::post('/budgets/duplicate', [\App\Http\Controllers\ProjectsController::class, 'duplicate'])->middleware(['auth'])->name('budget-duplicate');
 
 Route::middleware('auth')->group(function () {

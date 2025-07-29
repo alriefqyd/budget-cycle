@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\Log;
 
 class ProjectsService
 {
+    public function getData5Yp(){
+       $data =  BudgetCyclePeriod::all();
+       return $data;
+    }
     public function getDataProjectIndex()
     {
         $projects = Projects::with(['budgets','cashCostYearlies'])->get();
@@ -62,12 +66,17 @@ class ProjectsService
                 }
             }
 
+            $dataPeriod = BudgetCyclePeriod::where('start_year', $start_year)->first();
+
             return (object)[
                 'start_year' => $start_year,
                 'end_year' => $end_year,
                 'total_cost' => $total_cost,
                 'total_cash' => $total_cash,
-                'costCashYearlies' => $costCashYearlies
+                'costCashYearlies' => $costCashYearlies,
+                'status' => ApprovalStatus::from($dataPeriod->approval_status)->name,
+                'version' => $dataPeriod->version
+                // 'status' => $projects->getStatusBudgetCyclePeriod()
             ];
         });
 

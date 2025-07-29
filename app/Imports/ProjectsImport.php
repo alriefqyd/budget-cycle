@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Events\BudgetListUpdated;
+use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostYearly;
 use App\Models\project;
@@ -34,9 +35,10 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
     use RegistersEventListeners;
 
     private $uniqueIdentifiers = [];
-    public function __construct($year, $isBudgetCycle){
+    public function __construct($year, $isBudgetCycle, $budgetCyclePeriodId){
         $this->year = $year;
         $this->isBudgetCycle = $isBudgetCycle;
+        $this->budgetCyclePeriodId = $budgetCyclePeriodId;
     }
     public function batchSize(): int{
         return 1000;
@@ -120,24 +122,31 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         if ($row['sap_code'] !== null && preg_match('/^C[1-9]/', $row['sap_code'])) {
             if ($this->isBudgetCycle) {
                 // Check if existing project
-                $project = Projects::updateOrCreate(
-                    ['sap_code' => $row['sap_code']],
-                    [
-                        'project_title' => $row['project_title'],
-                        'note' => $row['note'],
-                        'status_progress' => $row['status_progress'],
-                        'project_manager' => $row['project_manager'],
-                        'project_control' => $row['project_control'],
-                        'directorate' => $row['directorate'],
-                        'owner_area' => $row['owner_area'],
-                        'type_of_investment' => $row['type_of_investment'],
-                        'category' => $row['category'],
-                        'risk_residual' => $row['risk_residual'],
-                        'risk_forecast' => $row['risk_forecast'],
-                        'fm_new' => $row['fm_new'],
-                        'year_period' => $row['year_period'],
-                    ]
-                );
+                $project = Projects::firstOrNew(['sap_code' => $row['sap_code']]);
+
+                // Fill other updatable fields
+                $project->fill([
+                    'project_title' => $row['project_title'],
+                    'note' => $row['note'],
+                    'status_progress' => $row['status_progress'],
+                    'project_manager' => $row['project_manager'],
+                    'project_control' => $row['project_control'],
+                    'directorate' => $row['directorate'],
+                    'owner_area' => $row['owner_area'],
+                    'type_of_investment' => $row['type_of_investment'],
+                    'category' => $row['category'],
+                    'risk_residual' => $row['risk_residual'],
+                    'risk_forecast' => $row['risk_forecast'],
+                    'fm_new' => $row['fm_new'],
+                    'year_period' => $row['year_period'],
+                ]);
+
+                // Only set budget_cycle_period_id when creating
+                if (!$project->exists) {
+                    $budgetId = BudgetCyclePeriod::where('start_year', $this->year)->first();
+                    $project->budget_cycle_period_id = $budgetId->id;
+                }
+                $project->save();
             } else {
                 $project = Projects::create([
                     'sap_code' => $row['sap_code'],
@@ -154,6 +163,7 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                     'risk_forecast' => $row['risk_forecast'],
                     'fm_new' => $row['fm_new'],
                     'year_period' => $row['year_period'],
+                    'budget_cycle_period_id' => $this->budgetCyclePeriodId
                 ]);
             }
 
@@ -216,7 +226,7 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                     'total_cash' => $totalCash,
                     'total_cost' => $totalCost,
                     'cost_remaining' => $budget5yp_cost - $totalCost,
-                    'cash_remaining' => $budget5yp - $totalCash
+                    'cash_remaining' => $budget5yp - $totalCash,
                 ]
             );
 

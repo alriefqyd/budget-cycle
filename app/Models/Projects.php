@@ -13,4 +13,12 @@ class Projects extends Model
     public function cashCostYearlies(){
         return $this->hasMany(CashCostYearly::class, 'project_id','id');
     }
+
+    public function budgetCyclePeriods(){
+        return $this->belongsTo(BudgetCyclePeriod::class, 'project_id','id');
+    }
+
+    public function getStatusBudgetCyclePeriods(){
+
+    }
 }

@@ -1063,6 +1063,113 @@ export default function Show() {
         }
     };
 
+    const handleDelete = async () => {
+
+        if (!selectedRowsState || selectedRowsState.length === 0) {
+            Swal.fire('No rows selected', 'Please select at least one row to delete.', 'warning');
+            return;
+        }
+
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: 'This action will permanently delete the selected budgets!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
+        let selectedRows = selectedRowsState.map(row => ({
+            ...row
+        }));
+
+        const ids = selectedRows.map(row => row.id);
+        const query = ids.map(id => `ids[]=${id}`).join('&');
+
+        try {
+
+            const response = await fetch(`/budgets?${query}&year=${startYear}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Delete failed:', errorData);
+                alert('Failed to delete budget.');
+                return;
+            }
+
+            setRowData(prevData =>
+                prevData.filter(row => !ids.includes(row.id))
+            );
+
+            // ✅ Optionally clear selection
+            setSelectedRowsState([]);
+        } catch (error) {
+            console.error('Error deleting:', error);
+            Swal.fire('Error', 'An unexpected error occurred.', 'error');
+        }
+
+    }
+
+    const handleFinalize = async () => {
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: 'This action will finalize the selected budgets and increment the version!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, Finalize!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            const response = await fetch(`/budgets-finalize/${startYear}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+
+            if(response.status === 200){
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Successfully Finalized',
+                    text: response.message,
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Finalized Error',
+                    text: response.message,
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+            }
+
+        } catch (e) {
+            console.error('Error finalize:', e);
+            Swal.fire('Error', 'An unexpected error occurred.', 'error');
+        }
+
+    }
+
     const agGridRef = useRef(); // <--- Add this
 
     return (
@@ -1074,79 +1181,77 @@ export default function Show() {
             }
         >
             <ContainerWrapper>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex gap-2">
-                        <Link href={'/budgets'}>
+
+                <nav className="flex items-center text-sm text-gray-500 mb-5" aria-label="Breadcrumb">
+                    <ol className="inline-flex items-center space-x-1">
+                        <li className="inline-flex items-center">
+                            <Link href={'/dashboard'} className="text-gray-500 hover:text-gray-700">
+                                Dashboard
+                            </Link>
+                        </li>
+                        <li>
+                            <span className="mx-2 text-gray-400">/</span>
+                            <Link href={'/budgets'} className="text-gray-500 hover:text-gray-700">
+                                Budgets
+                            </Link>
+                        </li>
+                        <li>
+                            <span className="mx-2 text-gray-400">/</span>
+                            <span className="text-gray-700 font-medium">{startYear} - {endYear}</span>
+                        </li>
+                    </ol>
+                </nav>
+
+                <div className="float"></div>
+                <div className="mb-1">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        {/* Left side buttons */}
+                        <div className="flex gap-1 flex-wrap">
                             <button
-                                className="inline-flex items-center px-2 py-2 bg-red-600 text-white text-sm font-medium rounded-lg shadow hover:bg-red-700 transition"
+                                onClick={() => setShowModal(true)}
+                                className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
                             >
-                                <svg
-                                    className="w-5 h-5 mr-2"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
-                                </svg>
-                                Back
+                                Import Data
                             </button>
-                        </Link>
+                            <button
+                                onClick={handleExport}
+                                className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Spinner/>
+                                        <span className="ml-2">Export Data...</span>
+                                    </>
+                                ) : (
+                                    'Export Data'
+                                )}
+                            </button>
+                        </div>
 
-                    </div>
-
-                    <div className="flex gap-2">
-                        {/*<button*/}
-                        {/*    onClick={handleAddNewRow}*/}
-                        {/*    className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"*/}
-                        {/*>*/}
-                        {/*    + Add New Row*/}
-                        {/*</button>*/}
-                        <button
-                            onClick={() => {
-                                setShowModal(true)
-                            }}
-                            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
-                        >
-                            Import Data
-                        </button>
-                        <button
-                            onClick={handleExport}
-                            className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
-                        >
-                            {loading ? (
-                                <>
-                                    <Spinner/>
-                                    <span className="ml-2">Export Data...</span>
-                                </>
-                            ) : 'Export Data' }
-                        </button>
-                        <button
-                            onClick={handleDuplicateRow}
-                            className="inline-flex items-center px-2 py-2 bg-yellow-500 text-white text-sm font-sm rounded-lg shadow hover:bg-yellow-600 transition"
-                        >
-                            ⧉ Duplicate
-                        </button>
-                        <button
-                            onClick={handleFullscreen}
-                            className="inline-flex items-center px-2 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg shadow hover:bg-blue-700 transition"
-                        >
-                            ⛶ Full Screen
-                        </button>
+                        {/* Right side buttons */}
+                        <div className="flex gap-2 flex-wrap">
+                            <button
+                                onClick={handleDelete}
+                                className="inline-flex items-center px-3 py-2 bg-red-800 text-white text-sm font-medium rounded-lg shadow hover:bg-red-700 transition"
+                            >
+                                🗑️ Delete Data
+                            </button>
+                            <button
+                                onClick={handleDuplicateRow}
+                                className="inline-flex items-center px-3 py-2 bg-yellow-500 text-white text-sm font-medium rounded-lg shadow hover:bg-yellow-600 transition"
+                            >
+                                ⧉ Duplicate
+                            </button>
+                            <button
+                                onClick={handleFullscreen}
+                                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg shadow hover:bg-blue-700 transition"
+                            >
+                                ⛶ Full Screen
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div className="mb-4 flex flex-wrap items-center justify-end">
-                    <div className="flex gap-2">
-                        {/*<button*/}
-                        {/*    onClick={() => {*/}
-                        {/*        setShowModal(true)*/}
-                        {/*    }}*/}
-                        {/*    className="inline-flex items-center px-2 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"*/}
-                        {/*>*/}
-                        {/*    Import Data*/}
-                        {/*</button>*/}
-                    </div>
-                </div>
+
                 <CardWrapper mb="mb-3">
                     <div className="space-x-4">
                         <button
@@ -1164,6 +1269,14 @@ export default function Show() {
                             }}
                         >
                             Budget Year To Date
+                        </button>
+                        <button className="float-end">
+                            <button
+                                onClick={handleFinalize}
+                                className="inline-flex items-center px-3 py-2 bg-green-800 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
+                            >
+                                Finalize Budget Cycle
+                            </button>
                         </button>
                     </div>
                 </CardWrapper>

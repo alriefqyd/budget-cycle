@@ -1,7 +1,7 @@
 import {useRef} from "react";
 import {Spinner} from "@/Components/Spinner.jsx";
 
-export default function UploadModal({ show, modalType , onClose, onSubmit, loading }) {
+export default function UploadModal({ show, modalType , onClose, onSubmit, loading, existingStartYear }) {
     const fileInput = useRef();
     const yearSelect = useRef();
 
@@ -42,9 +42,13 @@ export default function UploadModal({ show, modalType , onClose, onSubmit, loadi
                         className="block w-full mb-4 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                     >
                         <option value="">-- Choose Start Year --</option>
-                        {years.map((year) => (
-                            <option key={year} value={year}>{year}</option>
-                        ))}
+                        {years
+                            .filter((year) => !existingStartYear.includes(year))
+                            .map((year) => (
+                                <option key={year} value={year}>
+                                    {year}
+                                </option>
+                            ))}
                     </select>
 
                     {modalType == 'excel' ? (

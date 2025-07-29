@@ -9,6 +9,7 @@ use App\Exports\BudgetCyclePlanExport;
 use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
+use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
@@ -112,7 +113,7 @@ class ProjectsController extends Controller
             Log::info('Starting import projects...');
             try {
                 $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
-                Excel::import(new ProjectsImport($request->year, false), $file);
+                Excel::import(new ProjectsImport($request->year, false, $budgetCycle->id), $file);
                 Log::info('Import project successful');
                 return response()->json(['message' => 'Import Successful']);
             } catch (\Exception $e) {
@@ -146,7 +147,7 @@ class ProjectsController extends Controller
             Log::info('Starting import projects...');
             try {
                 $projectService = new ProjectsService;
-                $importClass = new ProjectsImport($request->year, true);
+                $importClass = new ProjectsImport($request->year, true, null);
                 Excel::import($importClass, $file);
                 Log::info('Import project successful');
                 return response()->json(['message' => 'Import Successful']);
@@ -170,7 +171,7 @@ class ProjectsController extends Controller
                 'sap_code' => 'Sap Code',
                 'year_period' => $request->year,
                 'start_year' => $request->year,
-                'budget_cycle_id' => $budgetCyclePeriod->id,
+                'budget_cycle_period_id' => $budgetCyclePeriod->id,
             ]);
             $projectService->updateBudgetList($request->year);
             return response()->json(['message' => 'Save Successful']);
@@ -273,5 +274,36 @@ class ProjectsController extends Controller
                 'data' => false
             ]);
         }
+    }
+
+    public function destroy(Request $request){
+        $projectService = new ProjectsService();
+        $ids = $request->input('ids'); // expects an array: ['1', '2', '3']
+
+        if (!is_array($ids)) {
+            return response()->json(['message' => 'Invalid ids.'], 400);
+        }
+
+        $projects = Projects::with(['budgets', 'cashCostYearlies'])->whereIn('id', $ids)->get();
+
+        foreach ($projects as $project) {
+            $project->budgets()->delete();
+            $project->cashCostYearlies()->delete();
+            $project->delete();
+        }
+
+
+        $projectService->updateBudgetList($request->year);
+        return response()->json(['message' => 'Budgets deleted.']);
+    }
+
+    public function finalize($year){
+        $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->firstOrFail();
+        $budgetPeriod->version = $budgetPeriod->version + 1;
+        $budgetPeriod->approval_status = ApprovalStatus::APPROVED;
+        $budgetPeriod->save();
+        $projectService = new ProjectsService();
+        $projectService->updateBudgetList($year);
+        return response()->json(['message' => 'Budgets deleted.','status' => 200]);
     }
 }

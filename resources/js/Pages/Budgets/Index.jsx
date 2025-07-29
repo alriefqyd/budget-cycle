@@ -10,13 +10,16 @@ import {Spinner} from "@/Components/Spinner.jsx";
 import Swal from "sweetalert2";
 import axios from "axios";
 
-export default function Dashboard() {
+export default function Budgets() {
     const { projects } = usePage().props;
     const [projectState, setProjectState] = useState(projects);
     const [modalType, setModalType] = useState('excel')
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
     const [shouldReload, setShouldReload] = useState(false);
+    let existingStartYear = projects.map(function (item) {
+        return item.start_year
+    })
 
     useEffect(() => {
         const channel = window.Echo.channel('budgetList')
@@ -145,6 +148,7 @@ export default function Dashboard() {
                 onClose={() => {
                     if (!loading) setShowModal(false);
                 }}
+                existingStartYear={existingStartYear}
                 onSubmit={handleUpload}
                 loading={loading}  // pass loading to modal
             />
