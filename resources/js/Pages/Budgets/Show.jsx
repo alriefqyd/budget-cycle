@@ -597,7 +597,6 @@ export default function Show() {
             return false;
         }
 
-        console.log(duplicatedRows)
         const response = await fetch('/budgets/duplicate', {
             method: 'POST',
             headers: {

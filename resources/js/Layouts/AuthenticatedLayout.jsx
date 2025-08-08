@@ -56,7 +56,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     <NavLink icon={<BarChart2 size={18}/>} label="Reports" href="/reports"/>
                     <NavLink icon={<Settings size={18}/>} label="Settings" href="/settings"/>
                 </nav>
-                <div className="p-4 text-sm text-center text-purple-200">© 2025 Vale Inc.</div>
+                <div className="p-4 text-sm text-center text-purple-200">© 2025 PT Vale Indonesia.</div>
             </aside>
 
             {/* Main content */}

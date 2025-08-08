@@ -12,10 +12,41 @@ class HomeController extends Controller
     public function index(){
         $year = date('Y') + 1;
         $dataChart = $this->getCashCostYearly($year);
+        $dataChart5Yp = $this->getData5yp($year);
         return Inertia::render('Dashboard',
         [
             'dataChart' => $dataChart,
+            'dataCostCash5yp' => $dataChart5Yp,
         ]);
+    }
+
+    public function getData5yp($startYear){
+        $costArr = [];
+        $cashArr = [];
+        $label = [];
+        foreach (range($startYear, $startYear + 4) as $index => $year) {
+            $cashPlan = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
+                return $item->cashCostYearlies->where('type', 'cash')->where('year', $year)->sum('amount');
+            });
+
+            $costPlan = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
+                return $item->cashCostYearlies->where('type', 'cost')->where('year', $year)->sum('amount');
+            });
+
+            // Round to 2 decimals instead of formatting
+            $cash = $cashPlan ? round($cashPlan / 1000000, 2) : 0;
+            $cost = $costPlan ? round($costPlan / 1000000, 2) : 0;
+
+            array_push($label, $year);
+            array_push($costArr, $cost);
+            array_push($cashArr, $cash);
+        }
+
+        return [
+            'label' => $label,
+            'cost' => $costArr,
+            'cash' => $cashArr,
+        ];
     }
 
     public function getCashCostYearly($startYear)
