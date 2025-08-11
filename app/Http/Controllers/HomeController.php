@@ -13,10 +13,13 @@ class HomeController extends Controller
         $year = date('Y') + 1;
         $dataChart = $this->getCashCostYearly($year);
         $dataChart5Yp = $this->getData5yp($year);
+        $pieChart = $this->getProjectByType($year);
+
         return Inertia::render('Dashboard',
         [
             'dataChart' => $dataChart,
             'dataCostCash5yp' => $dataChart5Yp,
+            'pieChart' => $pieChart,
         ]);
     }
 
@@ -113,5 +116,15 @@ class HomeController extends Controller
             'approved5yp' => $totalApprove5yp,
             'plan5yp' => $totalPlan5yp,
         ];
+    }
+
+    public function getProjectByType($year){
+        $data = Projects::where('year_period',$year)->whereNot('status_progress','new bc')->get()->groupBy('status_progress')->map(function ($items, $key) {
+            return [
+                'label' => $key,
+                'value' => $items->count(),
+            ];
+        })->values()->toArray();
+        return $data;
     }
 }

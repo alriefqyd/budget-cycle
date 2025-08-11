@@ -1,43 +1,43 @@
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import ChartDataLabels from 'chartjs-plugin-datalabels'; // for module use
+import { Pie } from 'react-chartjs-2';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    ArcElement,
+    Title,
+    Tooltip,
+    Legend
+} from 'chart.js';
+import ChartDataLabels from "chartjs-plugin-datalabels";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, ChartDataLabels);
 
-export default function PieChartCategory({dataChart, cols}) {
+export default function PieChartCategory({ dataChart, cols }) {
+    const defaultColors = [
+        'rgb(255, 99, 132)',
+        'rgb(54, 162, 235)',
+        'rgb(255, 205, 86)'
+    ]
+
     const data = {
-        labels: dataChart.label,
-        datasets: [
-            // Plan (2026–2030) - Left Axis
-            {
-                label: 'Cost',
-                data: dataChart.cost,
-                borderColor: 'green',
-                backgroundColor: '#009199',
-                yAxisID: 'approvedAxis',
-                barThickness: 52,
-            },
-            // Approved (2026–2030) - Left Axis
-            {
-                label: 'Cash',
-                data: dataChart.cash,
-                borderColor: 'blue',
-                backgroundColor: '#e9b733',
-                yAxisID: 'approvedAxis',
-                barThickness: 50,
-            },
-        ]
+        labels: dataChart.map((item) => item.label),
+        datasets: [{
+            label: 'Project Category',
+            data: dataChart.map((item) => item.value),
+            backgroundColor: dataChart.map((_, i) => defaultColors[i % defaultColors.length]),
+            hoverOffset: 4
+        }]
     };
 
     const options = {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             title: {
                 display: true,
-                text: '5YP 2026–2030 Cost and Cash (in million)',
-                font: {
-                    size: 16,
-                },
+                text: 'Project By Category',
+                font: { size: 16 },
             },
             tooltip: {
                 mode: 'index',
@@ -47,65 +47,33 @@ export default function PieChartCategory({dataChart, cols}) {
                 position: 'top',
                 labels: {
                     generateLabels: function (chart) {
-                        return chart.data.datasets
-                            .filter(ds => !ds.skipLegend) // ⬅️ filter out datasets with skipLegend
-                            .map((dataset, i) => {
-                                return {
-                                    text: dataset.label,
-                                    fillStyle: dataset.backgroundColor,
-                                    hidden: !chart.isDatasetVisible(i),
-                                    datasetIndex: i
-                                }
-                            });
+                        const data = chart.data;
+                        if (data.labels.length && data.datasets.length) {
+                            return data.labels.map((label, i) => ({
+                                text: label,
+                                fillStyle: data.datasets[0].backgroundColor[i],
+                                index: i
+                            }));
+                        }
+                        return [];
                     }
                 }
             },
             datalabels: {
-                anchor: 'end',
-                align: 'start',
-                offset: -20,
                 color: 'black',
-                font: {
-                    weight: 'bold',
-                    size: 12,
-
-                },
-                formatter: function (value) {
-                    return value?.toLocaleString(); // Adds commas
-                },
-            },
-        },
-        interaction: {
-            mode: 'nearest',
-            axis: 'x',
-            intersect: false,
-        },
-        scales: {
-            x: {
-                title: {
-                    display: true,
-                    text: 'Year',
-                },
-                categoryPercentage: 0.8,
-                barPercentage: 0.9
-            },
-        },
+                font: { weight: 'bold', size: 12 },
+                formatter: (value) => value.toLocaleString()
+            }
+        }
     };
 
     return (
         <div className={`grid grid-cols-1 md:grid-cols-${cols} gap-6 mb-6`}>
             <div className="md:col-span-6 bg-white rounded-xl p-6 shadow-lg">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h3 className="text-xl font-bold">Budget Chart</h3>
-                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                            <span className="text-green-500">▲</span> Budget Forecasting 2026–2030
-                        </p>
-                    </div>
+                <div style={{ height: '500px' }} className="flex justify-center items-center">
+                    <Pie data={data} options={options} />
                 </div>
-                <Bar options={options} data={data}/>
             </div>
         </div>
-    )
+    );
 }
-

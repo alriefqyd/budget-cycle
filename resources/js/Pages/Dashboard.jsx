@@ -16,9 +16,10 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 
 
 export default function Dashboard() {
-    const { dataChart, dataCostCash5yp } = usePage().props
+    const { dataChart, dataCostCash5yp, pieChart } = usePage().props
     const [dataChartDashboard, setDataChartDashboard] = useState(dataChart)
     const [dataChartCostCash, setDataChartCostCash] = useState(dataCostCash5yp)
+    const [dataCategory, setDataCategory] = useState(pieChart)
 
     // this will update data chart if broadcast exist
     useEffect(() => {
@@ -26,9 +27,11 @@ export default function Dashboard() {
             .listen('.dashboard.update', (event) => {
                 const newData = event.data;
                 const newDataCostCash = event.dataCostCash;
-                
+                const newDataCategory = event.dataCategory;
+
                 setDataChartDashboard(newData);
                 setDataChartCostCash(newDataCostCash);
+                setDataCategory(newDataCategory);
             });
 
         return () => {
@@ -50,7 +53,7 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <BarChartCostCash cols={6} dataChart={dataChartCostCash} />
-                    <PieChartCategory cols={6} dataChart={dataChartCostCash} />
+                    <PieChartCategory cols={6} dataChart={dataCategory} />
                 </div>
             </ContainerWrapper>
         </AuthenticatedLayout>

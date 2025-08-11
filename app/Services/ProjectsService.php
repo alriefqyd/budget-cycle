@@ -255,7 +255,8 @@ class ProjectsService
         $homeController = new HomeController();
         $dataChart = $homeController->getCashCostYearly($year);
         $dataCostCash = $homeController->getData5yp($year);
-        broadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash));
+        $dataCategory = $homeController->getProjectByType($year);
+        broadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash, $dataCategory));
     }
 
     public function updateBudgets($year, $id){
