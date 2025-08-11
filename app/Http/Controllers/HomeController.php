@@ -127,9 +127,9 @@ class HomeController extends Controller
             return [
                 'label' => $key,
                 'value' => $items->count(),
-                'budget' => $items->sum(function ($item) {
+                'budget' => number_format($items->sum(function ($item) {
                     return $item->cashCostYearlies->where('type', 'cash')->sum('amount');
-                }) / 1000000, // Convert to millions
+                }) / 1000000,2,'.',','), // Convert to millions
             ];
         })->values()->toArray();
         return $data;
