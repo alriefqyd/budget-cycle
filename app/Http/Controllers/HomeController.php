@@ -119,7 +119,7 @@ class HomeController extends Controller
     }
 
     public function getProjectByType($year){
-        $data = Projects::where('year_period',$year)->whereNot('status_progress','new bc')->get()->groupBy('status_progress')->map(function ($items, $key) {
+        $data = Projects::where('year_period',$year)->whereNot('status_progress','CAP')->get()->groupBy('status_progress')->map(function ($items, $key) {
             return [
                 'label' => $key,
                 'value' => $items->count(),
