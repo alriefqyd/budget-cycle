@@ -119,10 +119,17 @@ class HomeController extends Controller
     }
 
     public function getProjectByType($year){
-        $data = Projects::where('year_period',$year)->whereNot('status_progress','CAP')->get()->groupBy('status_progress')->map(function ($items, $key) {
+        // budget year cash exist
+        // add pie chart by budget and category
+        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
+            return $query->where('type', 'cash')->where('year', $year)->whereNotNull('amount')->where('amount','>',0);
+        })->get()->groupBy('status_progress')->map(function ($items, $key) {
             return [
                 'label' => $key,
                 'value' => $items->count(),
+                'budget' => $items->sum(function ($item) {
+                    return $item->cashCostYearlies->where('type', 'cash')->sum('amount');
+                }) / 1000000, // Convert to millions
             ];
         })->values()->toArray();
         return $data;
