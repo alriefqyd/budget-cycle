@@ -60,7 +60,7 @@ export default function PieChartCategory({ dataChart, cols }) {
                 }
             },
             legend: {
-                position: 'side',
+                position: 'left',
                 labels: {
                     generateLabels: function (chart) {
                         const data = chart.data;
