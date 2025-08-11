@@ -44,7 +44,7 @@ export default function PieChartCategory({ dataChart, cols }) {
         plugins: {
             title: {
                 display: true,
-                text: viewType === 'count' ? 'Project By Category' : 'Budget By Category',
+                text: viewType === 'count' ? 'Project By Category' : 'Budget By Category (Cash in Million)',
                 font: { size: 16 },
             },
             tooltip: {
