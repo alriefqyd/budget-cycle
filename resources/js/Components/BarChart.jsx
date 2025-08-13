@@ -75,7 +75,7 @@ export default function BarChart({dataChart, chartName, cols}) {
                 labels: {
                     generateLabels: function (chart) {
                         return chart.data.datasets
-                            .filter(ds => !ds.skipLegend) // ⬅️ filter out datasets with skipLegend
+                            .filter(ds => !ds.skipLegend)
                             .map((dataset, i) => {
                                 return {
                                     text: dataset.label,
@@ -109,6 +109,9 @@ export default function BarChart({dataChart, chartName, cols}) {
         },
         scales: {
             x: {
+                grid:{
+                    display: false
+                },
                 title: {
                     display: true,
                     text: 'Year',
@@ -125,6 +128,12 @@ export default function BarChart({dataChart, chartName, cols}) {
                     display: true,
                     text: 'Investment',
                 },
+                ticks: {
+                    display: false
+                },
+                grid:{
+                    display: false
+                }
 
             },
             planAxis: {
@@ -136,8 +145,11 @@ export default function BarChart({dataChart, chartName, cols}) {
                     display: true,
                     text: '5YP Total',
                 },
+                ticks: {
+                    display: false
+                },
                 grid: {
-                    drawOnChartArea: false,
+                    display: false,
                 },
             },
         },

@@ -49,7 +49,7 @@ export default function BarChartCostCash({dataChart, cols}) {
                 labels: {
                     generateLabels: function (chart) {
                         return chart.data.datasets
-                            .filter(ds => !ds.skipLegend) // ⬅️ filter out datasets with skipLegend
+                            .filter(ds => !ds.skipLegend)
                             .map((dataset, i) => {
                                 return {
                                     text: dataset.label,
@@ -83,12 +83,27 @@ export default function BarChartCostCash({dataChart, cols}) {
         },
         scales: {
             x: {
+                grid:{
+                    display: false
+                },
                 title: {
                     display: true,
                     text: 'Year',
                 },
                 categoryPercentage: 0.8,
                 barPercentage: 0.9
+            },
+            approvedAxis: {
+                ticks: {
+                    display: false
+                },
+                grid:{
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Investment',
+                },
             },
         },
     };

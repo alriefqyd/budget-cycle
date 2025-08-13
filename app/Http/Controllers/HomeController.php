@@ -60,18 +60,29 @@ class HomeController extends Controller
         $totalApprove5yp = [];
         $approvedArr = [];
         $label = [];
-        $lastYear = [200281789,194704553,178882078,104596538,0];
-        foreach (range($startYear, $startYear + 4) as $index => $year) {
-            $cashPlan = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
-                return $item->cashCostYearlies->where('type', 'cash')->where('year', $year)->sum('amount');
-            });
+        $lastYear = [150000000, 200281789, 194704553, 178882078, 104596538, 0];
 
-            $costPlan = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
-                return $item->cashCostYearlies->where('type', 'cost')->where('year', $year)->sum('amount');
-            });
+        foreach (range($startYear - 1, $startYear + 4) as $index => $year) {
+            $cashPlan = Projects::with('cashCostYearlies')
+                ->where('year_period', $startYear)
+                ->get()
+                ->sum(function ($item) use ($year) {
+                    return $item->cashCostYearlies
+                        ->where('type', 'cash')
+                        ->where('year', $year)
+                        ->sum('amount');
+                });
 
-            // Round to 2 decimals instead of formatting
-            // $approved = $approved ? round($approved / 1000000, 2) : 0;
+            $costPlan = Projects::with('cashCostYearlies')
+                ->where('year_period', $startYear)
+                ->get()
+                ->sum(function ($item) use ($year) {
+                    return $item->cashCostYearlies
+                        ->where('type', 'cost')
+                        ->where('year', $year)
+                        ->sum('amount');
+                });
+
             $plan = $cashPlan ? round($cashPlan / 1000000, 2) : 0;
             $approved = $lastYear[$index] ? round($lastYear[$index] / 1000000, 2) : 0;
 
@@ -82,31 +93,21 @@ class HomeController extends Controller
             array_push($totalApprove5yp, null);
         }
 
-        array_push($planArr,null);
+        // Always push nulls at the end for chart spacing
+        array_push($planArr, null);
         array_push($approvedArr, null);
 
-
-        // counting cash 5YP
-        /* $cash5yp = Projects::with(['budgets','cashCostYearlies'])
-            ->where('year_period', $startYear)
-            ->get()
-            ->reduce(function ($carry, $item) {
-                return $carry + ($item->budgets->total_cash ?? 0);
-            }, 0);
-
-        $cost5yp = Projects::with('budgets')->where('year_period', $startYear)->get()
-            ->reduce(function ($i, $item) {
-                return $i + $item->budgets?->total_cost ?? 0;
-            });
-
-        $cash5yp = $cash5yp ? round($cash5yp / 1000000, 2) : 0;
-        $cost5yp = $cost5yp ? round($cost5yp / 1000000, 2) : 0; */
-
+        // Compute 5YP sums, excluding startYear-1 from approved total
         $plan5yp = array_sum($planArr);
-        $approve5yp = array_sum($approvedArr);
+        $approve5yp = 0;
+        foreach ($approvedArr as $key => $value) {
+            // Skip nulls and skip the first year (startYear - 1)
+            if ($key === 0 || $value === null) continue;
+            $approve5yp += $value;
+        }
 
-        array_push($totalApprove5yp,$approve5yp);
-        array_push($totalPlan5yp,$plan5yp);
+        array_push($totalApprove5yp, $approve5yp);
+        array_push($totalPlan5yp, $plan5yp);
         array_push($label, '5YP');
 
         return [
@@ -118,17 +119,14 @@ class HomeController extends Controller
         ];
     }
 
+
     public function getProjectByType($year){
-        // budget year cash exist
-        // add pie chart by budget and category
-        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
-            return $query->where('type', 'cash')->where('year', $year)->whereNotNull('amount')->where('amount','>',0);
-        })->get()->groupBy('status_progress')->map(function ($items, $key) {
+        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->get()->groupBy('status_progress')->map(function ($items, $key) use ($year) {
             return [
                 'label' => $key,
                 'value' => $items->count(),
-                'budget' => number_format($items->sum(function ($item) {
-                    return $item->cashCostYearlies->where('type', 'cash')->sum('amount');
+                'budget' => number_format($items->sum(function ($item) use ($year) {
+                    return $item->cashCostYearlies->where('type', 'cash')->where('year',$year)->sum('amount');
                 }) / 1000000,2,'.',','), // Convert to millions
             ];
         })->values()->toArray();

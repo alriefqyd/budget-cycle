@@ -509,32 +509,34 @@ export default function Show() {
     }
 
     const handleExport = async () => {
-        setLoading(true);
-        const response = await fetch('/export/budgets', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            },
-            body: JSON.stringify({ year: startYear })
-        });
+        try {
+            setLoading(true);
 
-        if (!response.ok) {
-            console.error("Failed to export");
-            return;
+            const response = await axios.post(
+                '/export/budgets',
+                { year: startYear },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    },
+                    responseType: 'blob', // Important for binary data
+                }
+            );
+
+            // Create Blob and download
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `budget-cycle-${startYear}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Failed to export", error);
+        } finally {
+            setLoading(false);
         }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `budget-cycle-${startYear}.xlsx`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setLoading(false)
     };
 
     const handleAddNewRow = () => {
@@ -593,27 +595,24 @@ export default function Show() {
             year: startYear,
         }));
 
-        if(duplicatedRows.length < 1) {
+        if (duplicatedRows.length < 1) {
             return false;
         }
 
-        const response = await fetch('/budgets/duplicate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(duplicatedRows)
-        })
+        try {
+            const response = await axios.post('/budgets/duplicate', duplicatedRows, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
 
-        const result = await response.json();
-        if (!response.ok) {
-            console.error("Failed to duplicate budget record:", result);
-            alert("An error occurred while duplicate the data. Please try again.");
+            agGridRef.current.api.applyTransaction({ add: response.data.data, addIndex: 0 });
+        } catch (error) {
+            console.error("Failed to duplicate budget record:", error);
+            alert("An error occurred while duplicating the data. Please try again.");
         }
-
-        agGridRef.current.api.applyTransaction({ add: result.data, addIndex: 0 });
     };
     const onSelectionChanged = () => {
         const api = agGridRef.current.api;
@@ -993,15 +992,17 @@ export default function Show() {
         try {
             const isNew = !data.id; // if no ID, it's new
             data['year_period'] = startYear
-            const response = await fetch(isNew ? '/budgets' : `/budgets/${data.id}`, {
-                method: isNew ? 'POST' : 'PUT',
+            const url = isNew ? '/budgets' : `/budgets/${data.id}`;
+            const method = isNew ? 'post' : 'put';
+
+            const response = await axios({
+                method: method,
+                url: url,
+                data: data, // axios will handle JSON automatically
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                     'Accept': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
+                }
+            });
 
             const result = await response.json();
             if (!response.ok) {
@@ -1090,19 +1091,18 @@ export default function Show() {
         const query = ids.map(id => `ids[]=${id}`).join('&');
 
         try {
-
-            const response = await fetch(`/budgets?${query}&year=${startYear}`, {
-                method: 'DELETE',
+            const response = await axios.delete(`/budgets?${query}&year=${startYear}`, {
                 headers: {
-                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                     'Accept': 'application/json'
                 }
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error('Delete failed:', errorData);
+            console.log(response);
+
+            // axios puts parsed data in response.data
+            if (response.status !== 200) {
+                console.error('Delete failed:', response.data);
                 alert('Failed to delete budget.');
                 return;
             }
@@ -1111,13 +1111,11 @@ export default function Show() {
                 prevData.filter(row => !ids.includes(row.id))
             );
 
-            // ✅ Optionally clear selection
             setSelectedRowsState([]);
         } catch (error) {
             console.error('Error deleting:', error);
             Swal.fire('Error', 'An unexpected error occurred.', 'error');
         }
-
     }
 
     const handleFinalize = async () => {
@@ -1135,14 +1133,17 @@ export default function Show() {
         if (!result.isConfirmed) return;
 
         try {
-            const response = await fetch(`/budgets-finalize/${startYear}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'Accept': 'application/json'
+            const response = await axios.put(
+                `/budgets-finalize/${startYear}`,
+                {}, // empty body since original fetch didn’t send data
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    }
                 }
-            });
+            );
 
             if(response.status === 200){
                 Swal.fire({
