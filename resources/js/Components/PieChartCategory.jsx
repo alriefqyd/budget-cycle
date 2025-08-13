@@ -44,8 +44,9 @@ export default function PieChartCategory({ dataChart, cols }) {
         plugins: {
             title: {
                 display: true,
-                text: viewType === 'count' ? 'Project By Category' : 'Budget By Category (Cash in Million)',
+                text: viewType === 'count' ? '2026 Project By Category' : '2026 Budget By Category (Cash in Million)',
                 font: { size: 16 },
+                padding: { bottom: 20 }
             },
             tooltip: {
                 mode: 'index',
@@ -62,6 +63,7 @@ export default function PieChartCategory({ dataChart, cols }) {
             legend: {
                 position: 'left',
                 labels: {
+                    usePointStyle:true,
                     generateLabels: function (chart) {
                         const data = chart.data;
                         if (data.labels.length && data.datasets.length) {
@@ -103,8 +105,8 @@ export default function PieChartCategory({ dataChart, cols }) {
                         onChange={(e) => setViewType(e.target.value)}
                         className="border rounded p-2 w-full md:w-1/5"
                     >
-                        <option value="count">Total Projects</option>
-                        <option value="budget">Total Budget</option>
+                        <option value="count">Total Projects 2026</option>
+                        <option value="budget">Total Budget 2026</option>
                     </select>
                 </div>
 

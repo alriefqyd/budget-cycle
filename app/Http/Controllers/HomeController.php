@@ -97,17 +97,11 @@ class HomeController extends Controller
         array_push($planArr, null);
         array_push($approvedArr, null);
 
-        // Compute 5YP sums, excluding startYear-1 from approved total
         $plan5yp = array_sum($planArr);
-        $approve5yp = 0;
-        foreach ($approvedArr as $key => $value) {
-            // Skip nulls and skip the first year (startYear - 1)
-            if ($key === 0 || $value === null) continue;
-            $approve5yp += $value;
-        }
+        $approve5yp = array_sum($approvedArr);
 
-        array_push($totalApprove5yp, $approve5yp);
-        array_push($totalPlan5yp, $plan5yp);
+        array_push($totalApprove5yp,$approve5yp);
+        array_push($totalPlan5yp,$plan5yp);
         array_push($label, '5YP');
 
         return [
@@ -121,8 +115,9 @@ class HomeController extends Controller
 
 
     public function getProjectByType($year){
-        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->get()->groupBy('status_progress')->map(function ($items, $key) use ($year) {
-            return [
+        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
+            return $query->where('type', 'cash')->where('year', $year)->whereNotNull('amount')->where('amount','>',0);
+        })->get()->groupBy('status_progress')->map(function ($items, $key) use ($year) {    return [
                 'label' => $key,
                 'value' => $items->count(),
                 'budget' => number_format($items->sum(function ($item) use ($year) {
