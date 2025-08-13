@@ -116,7 +116,7 @@ class HomeController extends Controller
 
     public function getProjectByType($year){
         $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
-            return $query->where('type', 'cash')->where('year', $year)->whereNotNull('amount')->where('amount','>',0);
+            return $query->where('year', $year)->whereNotNull('amount')->where('amount','>',0);
         })->get()->groupBy('status_progress')->map(function ($items, $key) use ($year) {    return [
                 'label' => $key,
                 'value' => $items->count(),
