@@ -14,7 +14,7 @@ export default function BarChart({dataChart, chartName, cols}) {
         datasets: [
             // Plan (2026–2030) - Left Axis
             {
-                label: 'Plan',
+                label: 'Plan 2026-2030',
                 data: dataChart.plan,
                 borderColor: '#2CA6A4',
                 backgroundColor:  'rgb(214,61,92)',
@@ -23,7 +23,7 @@ export default function BarChart({dataChart, chartName, cols}) {
             },
             // Approved (2026–2030) - Left Axis
             {
-                label: 'Approved',
+                label: 'Budget cycle 2025-2029',
                 data: dataChart.approved,
                 borderColor: '#0D47A1',
                 backgroundColor: 'rgb(34,133,200)',
