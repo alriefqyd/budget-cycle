@@ -14,12 +14,14 @@ class HomeController extends Controller
         $dataChart = $this->getCashCostYearly($year);
         $dataChart5Yp = $this->getData5yp($year);
         $pieChart = $this->getProjectByType($year);
+        $floatingChart = $this->getProjectByDirectorate($year);
 
         return Inertia::render('Dashboard',
         [
             'dataChart' => $dataChart,
             'dataCostCash5yp' => $dataChart5Yp,
             'pieChart' => $pieChart,
+            'floatingChart' => $floatingChart,
         ]);
     }
 
@@ -126,5 +128,30 @@ class HomeController extends Controller
             ];
         })->values()->toArray();
         return $data;
+    }
+
+    public function getProjectByDirectorate($year){
+        $arrLabel = [];
+        $arrBudget = [];
+        $arrCount = [];
+        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
+            return $query->where('year', $year)->where('type','cash')->whereNotNull('amount')->where('amount','>',0);
+        })->get()->groupBy('owner_area')
+            ->map(function ($items, $key) use ($year, &$arrLabel, &$arrBudget, &$arrCount) {
+            $budget = number_format($items->sum(function ($item) use ($year) {
+                    return $item->cashCostYearlies->where('type', 'cash')->where('year',$year)->sum('amount');
+                }) / 1000000,2,'.',',');
+            array_push($arrLabel, $key);
+            array_push($arrBudget, $budget);
+            array_push($arrCount, $items->count());
+        })->values()->toArray();
+
+        array_push($arrLabel, 'Total');
+        array_push($arrBudget, (string) array_sum($arrBudget));
+        return [
+            'label' => $arrLabel,
+            'budget' => $arrBudget,
+            'count' => $arrCount,
+        ];
     }
 }

@@ -10,13 +10,14 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import BarChart from "@/Components/BarChart.jsx";
 import BarChartCostCash from "@/Components/BarChartCostCash.jsx";
-import PieChartCategory from "@/Components/PieChartCategory.jsx"; // for module use
+import PieChartCategory from "@/Components/PieChartCategory.jsx";
+import FloatingChart from "@/Components/FloatingChart.jsx"; // for module use
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
 
 
 export default function Dashboard() {
-    const { dataChart, dataCostCash5yp, pieChart } = usePage().props
+    const { dataChart, dataCostCash5yp, pieChart, floatingChart } = usePage().props
     const [dataChartDashboard, setDataChartDashboard] = useState(dataChart)
     const [dataChartCostCash, setDataChartCostCash] = useState(dataCostCash5yp)
     const [dataCategory, setDataCategory] = useState(pieChart)
@@ -51,9 +52,12 @@ export default function Dashboard() {
             <ContainerWrapper>
                 <BarChart chartName="chart5YP" dataChart={dataChartDashboard} />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <BarChartCostCash cols={6} dataChart={dataChartCostCash} />
                     <PieChartCategory cols={6} dataChart={dataCategory} />
+                </div>
+                <div className="grid grid-cols-1">
+                    <FloatingChart dataChart={floatingChart}/>
                 </div>
             </ContainerWrapper>
         </AuthenticatedLayout>
