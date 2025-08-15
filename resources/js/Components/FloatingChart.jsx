@@ -84,6 +84,7 @@ const createWaterfallData = (steps, colors) => {
 
 export default function WaterfallComparison({dataChart}) {
 
+    console.log(dataChart)
     const catChartRef = useRef(null);
     const ownerInitialRef = useRef(null);
     const catChartInstance = useRef(null);
@@ -136,7 +137,7 @@ export default function WaterfallComparison({dataChart}) {
                 if (ref.current) ref.current.destroy();
             });
         };
-    }, []);
+    }, [dataChart]);
 
     return (
         <div className="card bg-white shadow-lg rounded-lg p-6">

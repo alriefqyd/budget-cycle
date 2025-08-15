@@ -21,6 +21,7 @@ export default function Dashboard() {
     const [dataChartDashboard, setDataChartDashboard] = useState(dataChart)
     const [dataChartCostCash, setDataChartCostCash] = useState(dataCostCash5yp)
     const [dataCategory, setDataCategory] = useState(pieChart)
+    const [dataByDirectorate, setDataByDirectorate] = useState(floatingChart);
 
     // this will update data chart if broadcast exist
     useEffect(() => {
@@ -29,10 +30,13 @@ export default function Dashboard() {
                 const newData = event.data;
                 const newDataCostCash = event.dataCostCash;
                 const newDataCategory = event.dataCategory;
+                const newDataByDirectorate = event.dataOwner;
 
                 setDataChartDashboard(newData);
                 setDataChartCostCash(newDataCostCash);
                 setDataCategory(newDataCategory);
+                setDataByDirectorate(newDataByDirectorate);
+                console.log(newDataByDirectorate)
             });
 
         return () => {
@@ -57,7 +61,7 @@ export default function Dashboard() {
                     <PieChartCategory cols={6} dataChart={dataCategory} />
                 </div>
                 <div className="grid grid-cols-1">
-                    <FloatingChart dataChart={floatingChart}/>
+                    <FloatingChart dataChart={dataByDirectorate}/>
                 </div>
             </ContainerWrapper>
         </AuthenticatedLayout>
