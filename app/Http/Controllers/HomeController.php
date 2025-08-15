@@ -130,28 +130,55 @@ class HomeController extends Controller
         return $data;
     }
 
-    public function getProjectByDirectorate($year){
+    public function getProjectByDirectorate($year)
+    {
         $arrLabel = [];
         $arrBudget = [];
         $arrCount = [];
-        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
-            return $query->where('year', $year)->where('type','cash')->whereNotNull('amount')->where('amount','>',0);
-        })->get()->groupBy('owner_area')
-            ->map(function ($items, $key) use ($year, &$arrLabel, &$arrBudget, &$arrCount) {
-            $budget = number_format($items->sum(function ($item) use ($year) {
-                    return $item->cashCostYearlies->where('type', 'cash')->where('year',$year)->sum('amount');
-                }) / 1000000,2,'.',',');
-            array_push($arrLabel, $key);
-            array_push($arrBudget, $budget);
-            array_push($arrCount, $items->count());
-        })->values()->toArray();
 
-        array_push($arrLabel, 'Total');
-        array_push($arrBudget, (string) array_sum($arrBudget));
+        $data = Projects::with('cashCostYearlies')
+            ->where('year_period', $year)
+            ->whereNot('status_progress', 'CAP')
+            ->whereHas('cashCostYearlies', function ($query) use ($year) {
+                return $query->where('year', $year)
+                    ->where('type', 'cash')
+                    ->whereNotNull('amount')
+                    ->where('amount', '>', 0);
+            })
+            ->get()
+            ->groupBy('owner_area')
+            ->map(function ($items, $key) use ($year) {
+                $budget = $items->sum(function ($item) use ($year) {
+                    return $item->cashCostYearlies
+                        ->where('type', 'cash')
+                        ->where('year', $year)
+                        ->sum('amount');
+                });
+                return [
+                    'label'  => $key,
+                    'budget' => $budget, // keep raw for sorting
+                    'count'  => $items->count(),
+                ];
+            })
+            ->sortByDesc('budget') // sort from biggest to smallest
+            ->values();
+
+        // Now push into your arrays and format budget
+        foreach ($data as $row) {
+            $arrLabel[]  = $row['label'];
+            $arrBudget[] = number_format($row['budget'] / 1000000, 2, '.', ',');
+            $arrCount[]  = $row['count'];
+        }
+
+        // Add total
+        $arrLabel[]  = 'Total';
+        $arrBudget[] = number_format(array_sum(array_column($data->toArray(), 'budget')) / 1000000, 2, '.', ',');
+
         return [
-            'label' => $arrLabel,
+            'label'  => $arrLabel,
             'budget' => $arrBudget,
-            'count' => $arrCount,
+            'count'  => $arrCount,
         ];
     }
+
 }
