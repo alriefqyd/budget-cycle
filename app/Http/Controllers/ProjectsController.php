@@ -298,12 +298,17 @@ class ProjectsController extends Controller
     }
 
     public function finalize($year){
-        $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->firstOrFail();
-        $budgetPeriod->version = $budgetPeriod->version + 1;
-        $budgetPeriod->approval_status = ApprovalStatus::APPROVED;
-        $budgetPeriod->save();
-        $projectService = new ProjectsService();
-        $projectService->updateBudgetList($year);
-        return response()->json(['message' => 'Budgets deleted.','status' => 200]);
+        try{
+            $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->firstOrFail();
+            $budgetPeriod->version = $budgetPeriod->version + 1;
+            $budgetPeriod->approval_status = ApprovalStatus::APPROVED;
+            $budgetPeriod->save();
+            $projectService = new ProjectsService();
+            $projectService->updateBudgetList($year);
+            return response()->json(['message' => 'Budgets finalize.','status' => 200]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+
     }
 }
