@@ -21,7 +21,7 @@ export default function RowTable(props) {
             <td className="px-4 py-3 text-right font-semibold">$ {item.total_cash.toLocaleString()}</td>
             <td className="px-4 py-3 text-right font-semibold">$ {item.total_cost.toLocaleString()}</td>
             <td className="px-4 py-3 text-right font-semibold">{item.status}</td>
-            <td className="px-4 py-3 text-right font-semibold">{item.version}</td>
+            {/*<td className="px-4 py-3 text-right font-semibold">{item.version}</td>*/}
             <td className="px-4 py-3 text-center">
                 <label className="mb-2 block">Cash</label>
                 <div className="flex flex-wrap gap-1 justify-center text-xs text-gray-700 mb-5 font-medium">

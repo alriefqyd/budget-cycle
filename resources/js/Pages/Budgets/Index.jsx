@@ -120,7 +120,7 @@ export default function Budgets() {
                                     <th className="px-4 py-3 text-right">Cash Total</th>
                                     <th className="px-4 py-3 text-right">Cost Total</th>
                                     <th className="px-4 py-3 text-right">Status</th>
-                                    <th className="px-4 py-3 text-right">Version</th>
+                                    {/*<th className="px-4 py-3 text-right">Version</th>*/}
                                     <th className="px-4 py-3 text-center">
                                         Yearly Breakdown
                                     </th>
