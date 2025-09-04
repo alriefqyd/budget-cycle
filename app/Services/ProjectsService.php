@@ -75,7 +75,7 @@ class ProjectsService
                 'total_cost' => $total_cost,
                 'total_cash' => $total_cash,
                 'costCashYearlies' => $costCashYearlies,
-                'status' => isset($dataPeriod->approval_status) ? $this->ordinal($dataPeriod->version) .' '. ApprovalStatus::from($dataPeriod->approval_status)->name : 'N/A',
+                'status' => isset($dataPeriod->approval_status) ? $this->ordinal($dataPeriod->version - 1) .' '. ApprovalStatus::from($dataPeriod->approval_status)->name : 'N/A',
                 'version' => $dataPeriod->version ?? 0,
                 // 'status' => $projects->getStatusBudgetCyclePeriod()
             ];
@@ -358,6 +358,7 @@ class ProjectsService
     }
 
     function ordinal($number) {
+        if($number < 0) return 'N/A';
         $ends = ['th','st','nd','rd','th','th','th','th','th','th'];
         if (($number % 100) >= 11 && ($number % 100) <= 13) {
             return $number . 'th';
