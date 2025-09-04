@@ -30,6 +30,7 @@ import UploadModal from "@/Components/Budgets/UploadModal.jsx";
 import UploadModalDetail from "@/Components/Budgets/UploadModalDetail.jsx";
 import Swal from "sweetalert2";
 import {Spinner} from "@/Components/Spinner.jsx";
+import Modal from "@/Components/Modal.jsx";
 
 
 ModuleRegistry.registerModules([
@@ -53,8 +54,10 @@ ModuleRegistry.registerModules([
 export default function Show() {
     const gridRef = useRef();
     const lastUpdatedId = useRef(null);
-    const { projects, year, budgets } = usePage().props
+    const { projects, year, budgets, versions, budgetVersion} = usePage().props
     const [activeTab, setActiveTab] = useState('Tab1');
+    const [versionBudgetPeriod, setVersionBudgetPeriod] = useState(budgetVersion.version);
+    const [versionList, setVersionList] = useState(versions);
     const [selectedRow, setSelectedRow] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
@@ -66,32 +69,11 @@ export default function Show() {
     const month = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const [selectedRowsState, setSelectedRowsState] = useState([]);
     const [budgetTotalYear, setBudgetTotalYear] = useState(0);
+    const [loadingFinalize, setLoadingFinalize] = useState(false)
 
-    // useEffect(() => {
-    //     // const channel = window.Echo.channel('budgets')
-    //     //     .listen('.budgets.update', (event) => {
-    //     //        setRowData(event.data);
-    //     //     });
-    //
-    //     // this is websocket handshake (subscribtion) running once component rendered
-    //     const channel = window.Echo.channel('budgets')
-    //         .listen('.budgets.update', (event) => {
-    //             const updatedRow = event.data; // should be a plain object
-    //             const agGridApi = agGridRef.current.api;
-    //             const rowNode = agGridApi.getRowNode(String(updatedRow.id));
-    //             if(!rowNode){
-    //                 setRowData(prev => ({
-    //                     ...prev,
-    //                     data: updatedRow
-    //                 }));
-    //
-    //                 agGridRef.current.api.applyTransaction({ add: [updatedRow], addIndex: 0 });
-    //             } else {
-    //                 rowNode.setData(updatedRow);
-    //                 agGridApi.flashCells({ rowNodes: [rowNode], columns: Object.keys(updatedRow) });
-    //             }
-    //         });
-    // }, []);
+    useEffect(() => {
+        fetchVersionList();
+    }, [startYear]);
 
     useEffect(() => {
         const channel = window.Echo.channel('budgets')
@@ -137,7 +119,7 @@ export default function Show() {
         return () => {
             channel.stopListening('.budgets.update');
         };
-    }, []);
+    }, [versionBudgetPeriod]);
 
     // const [rowData, setRowData] = useState([]);
     const [rowData, setRowData] = useState([]);
@@ -539,6 +521,35 @@ export default function Show() {
         }
     };
 
+    const getBudgetByVersion = async (version) => {
+        const response = await axios({
+            method: 'get',
+            url: `/budgets-version/${startYear}/${version}`,
+            data:{
+                version: version
+            },
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+
+        return response
+    }
+    const handleChangeVersion = async (e) => {
+        setLoading(true)
+        setVersionBudgetPeriod(e.target.value)
+        const response = await getBudgetByVersion(e.target.value)
+
+        if(response.status === 200) {
+            setRowData(response.data.budgets);
+            setLoading(false)
+        } else {
+            Swal.fire('Error', response.message, 'warning');
+            setLoading(false)
+        }
+
+    }
+
     const handleAddNewRow = () => {
         const newRow = {
             id: null,
@@ -603,7 +614,6 @@ export default function Show() {
             const response = await axios.post('/budgets/duplicate', duplicatedRows, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                     'Accept': 'application/json'
                 }
             });
@@ -1093,8 +1103,7 @@ export default function Show() {
         try {
             const response = await axios.delete(`/budgets?${query}&year=${startYear}`, {
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'Accept': 'application/json'
+                     'Accept': 'application/json'
                 }
             });
 
@@ -1130,22 +1139,24 @@ export default function Show() {
             cancelButtonText: 'Cancel'
         });
 
+        console.log(versionBudgetPeriod)
         if (!result.isConfirmed) return;
-
+        setLoadingFinalize(true)
         try {
-            const response = await axios.put(
-                `/budgets-finalize/${startYear}`,
-                {}, // empty body since original fetch didn’t send data
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                        'Accept': 'application/json'
-                    }
+            const response = await axios({
+                method: 'put',
+                url: `/budgets-finalize/${startYear}/${versionBudgetPeriod}`,
+                data: {}, // axios will handle JSON automatically
+                headers: {
+                    'Accept': 'application/json'
                 }
-            );
+            });
 
             if(response.status === 200){
+                await fetchVersionList();
+                setVersionBudgetPeriod(prev => prev + 1);
+                const budgetByVersion = await getBudgetByVersion(versionBudgetPeriod + 1)
+                setRowData(budgetByVersion.data.budgets)
                 Swal.fire({
                     icon: 'success',
                     title: 'Successfully Finalized',
@@ -1163,12 +1174,23 @@ export default function Show() {
                 });
             }
 
+            setLoadingFinalize(false)
+
         } catch (e) {
             console.error('Error finalize:', e);
             Swal.fire('Error', 'An unexpected error occurred.', 'error');
         }
 
     }
+
+    const fetchVersionList = async () => {
+        try {
+            const response = await axios.get(`/budgets-versions/${startYear}`);
+            setVersionList(response.data.data);
+        } catch (e) {
+            console.error("Error fetching version list:", e);
+        }
+    };
 
     const agGridRef = useRef(); // <--- Add this
 
@@ -1201,6 +1223,10 @@ export default function Show() {
                         </li>
                     </ol>
                 </nav>
+
+                <div className="left">
+
+                </div>
 
                 <div className="float"></div>
                 <div className="mb-1">
@@ -1253,36 +1279,67 @@ export default function Show() {
                 </div>
 
                 <CardWrapper mb="mb-3">
-                    <div className="space-x-4">
-                        <button
-                            className={`px-4 py-2 ${activeTab === 'Tab1' ? 'border-b-2 border-yellow-500 text-teal-700 font-semibold' : ''}`}
-                            onClick={() => {
-                                setActiveTab('Tab1');
-                            }}
-                        >
-                            Budget 5 Years
-                        </button>
-                        <button
-                            className={`px-4 py-2 ${activeTab === 'Tab2' ? 'border-b-2 border-yellow-500 text-teal-700 font-semibold' : ''}`}
-                            onClick={() => {
-                                setActiveTab('Tab2');
-                            }}
-                        >
-                            Budget Year To Date
-                        </button>
-                        <button className="float-end">
+                    <div className="flex items-center justify-between">
+                        {/* Tabs Section */}
+                        <div className="flex space-x-4">
+                            <button
+                                className={`px-4 py-2 ${
+                                    activeTab === "Tab1"
+                                        ? "border-b-2 border-yellow-500 text-teal-700 font-semibold"
+                                        : ""
+                                }`}
+                                onClick={() => setActiveTab("Tab1")}
+                            >
+                                Budget 5 Years
+                            </button>
+                            <button
+                                className={`px-4 py-2 ${
+                                    activeTab === "Tab2"
+                                        ? "border-b-2 border-yellow-500 text-teal-700 font-semibold"
+                                        : ""
+                                }`}
+                                onClick={() => setActiveTab("Tab2")}
+                            >
+                                Budget Year To Date
+                            </button>
+                        </div>
+
+                        {/* Right Side: Actions */}
+                        <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                                <label className="text-sm font-medium text-gray-700">Version:</label>
+                                <select
+                                    className="border rounded-lg px-5 py-1 text-sm focus:ring focus:ring-yellow-400"
+                                    value={versionBudgetPeriod}
+                                    onChange={handleChangeVersion}
+                                >
+                                    {versionList.map((version) => (
+                                        <option key={version} value={version}>
+                                            {version}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <button
                                 onClick={handleFinalize}
                                 className="inline-flex items-center px-3 py-2 bg-green-800 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
                             >
                                 Finalize Budget Cycle
                             </button>
-                        </button>
+                        </div>
                     </div>
                 </CardWrapper>
+
                 <CardWrapper>
-                    <div ref={gridRef} className="ag-theme-alpine"
-                         style={{height: "calc(100vh - 150px)", width: "100%"}}>
+                    {loading ? (
+                        <>
+                            <div className="col-md-12 p-2">
+                                <Spinner/>
+                                Loading data, please wait...</div>
+                        </>
+                    ) :  <div ref={gridRef} className="ag-theme-alpine"
+                              style={{height: "calc(100vh - 150px)", width: "100%"}}>
                         <AgGridReact
                             ref={agGridRef}
                             rowData={rowData}
@@ -1299,7 +1356,7 @@ export default function Show() {
                             getRowId={params => params.data.id}
                             pinnedTopRowData={calculateTotals(rowData)}
                         />
-                    </div>
+                    </div> }
                 </CardWrapper>
             </ContainerWrapper>
 
@@ -1311,6 +1368,14 @@ export default function Show() {
                 onSubmit={handleImport}
                 loading={loading}
             />
+
+            <Modal show={loadingFinalize}>
+                <div className="flex flex-col items-center justify-center h-48 p-4 text-center">
+                    <Spinner color="text-green-800" />
+                    <p className="mt-3 text-gray-700">Loading process finalize, please wait...</p>
+                </div>
+            </Modal>
+
         </AuthenticatedLayout>
     )
 }

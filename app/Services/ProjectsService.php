@@ -11,6 +11,7 @@ use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProjectsService
@@ -66,7 +67,7 @@ class ProjectsService
                 }
             }
 
-            $dataPeriod = BudgetCyclePeriod::where('start_year', $start_year)->first();
+            $dataPeriod = BudgetCyclePeriod::where('start_year', $start_year)->orderBy('version','desc')->first();
 
             return (object)[
                 'start_year' => $start_year,
@@ -74,8 +75,8 @@ class ProjectsService
                 'total_cost' => $total_cost,
                 'total_cash' => $total_cash,
                 'costCashYearlies' => $costCashYearlies,
-                'status' => ApprovalStatus::from($dataPeriod->approval_status)->name,
-                'version' => $dataPeriod->version
+                'status' => isset($dataPeriod->approval_status) ? $this->ordinal($dataPeriod->version) .' '. ApprovalStatus::from($dataPeriod->approval_status)->name : 'N/A',
+                'version' => $dataPeriod->version ?? 0,
                 // 'status' => $projects->getStatusBudgetCyclePeriod()
             ];
         });
@@ -111,7 +112,8 @@ class ProjectsService
             'start_year' => $request->year,
             'end_year' => $request->year + 4,
             'total_cost' => 0,
-            'total_cast' => 0
+            'total_cast' => 0,
+            'version' => 0,
         ]);
 
         return $data;
@@ -160,10 +162,23 @@ class ProjectsService
         }
     }
 
-    public function getBudgetsByYear($year, $id){
-        $budgets = Projects::with(['budgets','cashCostYearlies'])
-            ->when($id,function($query) use ($id){
+    public function getBudgetsByYear($year, $id, $version = null){
+        $budgets = Projects::with(['budgets','cashCostYearlies','budgetCyclePeriod'])
+            ->when(isset($id),function($query) use ($id){
                 return $query->where('id', $id);
+            })
+            ->when($version, function ($query) use ($version, $year) {
+                // If version is provided
+                return $query->whereHas('budgetCyclePeriod', function ($q) use ($version, $year) {
+                    $q->where('version', $version);
+                });
+            }, function ($query) use ($year) {
+                $latestVersion = \App\Models\BudgetCyclePeriod::where('start_year', $year)
+                    ->max('version');
+
+                return $query->whereHas('budgetCyclePeriod', function ($q) use ($latestVersion) {
+                    $q->where('version', $latestVersion);
+                });
             })
             ->where('year_period', $year)
             ->get()
@@ -268,6 +283,86 @@ class ProjectsService
         $projectService = new ProjectsService();
         $data = $projectService->getDataProjectIndex();
         broadcast(new BudgetListUpdated($data->toArray()));
+    }
+
+    public function duplicateDataFinalize($budgetPeriodId){
+        try {
+            $budgetPeriod = BudgetCyclePeriod::findOrFail($budgetPeriodId);
+
+            DB::transaction(function () use ($budgetPeriod) {
+                // duplicate budget period
+                $newBudgetPeriod = $budgetPeriod->replicate();
+                $newBudgetPeriod->version = $budgetPeriod->version + 1;
+                $newBudgetPeriod->save();
+
+                // process projects in chunks
+                Projects::with(['budgets', 'cashCostYearLies.cashCostMonthly'])
+                    ->where('budget_cycle_period_id', $budgetPeriod->id)
+                    ->chunk(20, function ($projects) use ($newBudgetPeriod) {
+                        foreach ($projects as $project) {
+                            $newProject = $project->replicate();
+                            $newProject->year_period = $project->year_period;
+                            $newProject->budget_cycle_period_id = $newBudgetPeriod->id;
+                            $newProject->save();
+
+                            // duplicate budget
+                            if ($project->budgets) {
+                                $newBudget = $project->budgets->replicate();
+                                $newBudget->project_id = $newProject->id;
+                                $newBudget->save();
+                            }
+
+                            // duplicate yearly + monthly
+                            if ($project->cashCostYearLies && $project->cashCostYearLies->count() > 0) {
+                                foreach ($project->cashCostYearLies as $yearly) {
+                                    $newYearly = $yearly->replicate();
+                                    $newYearly->project_id = $newProject->id;
+                                    $newYearly->save();
+
+                                    // bulk insert monthlies
+                                    if ($yearly->cashCostMonthly && $yearly->cashCostMonthly->count() > 0) {
+                                        $newMonthlies = [];
+                                        foreach ($yearly->cashCostMonthly as $monthly) {
+                                            $newMonthlies[] = [
+                                                'yearly_id' => $newYearly->id,
+                                                'month' => $monthly->month,
+                                                'amount' => $monthly->amount,
+                                                'type' => $monthly->type,
+                                                'created_at' => now(),
+                                                'updated_at' => now(),
+                                            ];
+                                        }
+                                        if (!empty($newMonthlies)) {
+                                            CashCostMonthly::insert($newMonthlies);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+            });
+        } catch (\Throwable $th) {
+            Log::error('Error duplicateDataFinalize: '.$th->getMessage());
+            throw $th;
+        }
+
+    }
+
+    public function getVersionListByYear($year){
+        $versions = BudgetCyclePeriod::where('start_year', $year)->orderBy('version', 'desc')->get();
+        $versions = $versions->map(function ($version) {
+            return $version->version;
+        });
+
+        return $versions;
+    }
+
+    function ordinal($number) {
+        $ends = ['th','st','nd','rd','th','th','th','th','th','th'];
+        if (($number % 100) >= 11 && ($number % 100) <= 13) {
+            return $number . 'th';
+        }
+        return $number . $ends[$number % 10];
     }
 
 }

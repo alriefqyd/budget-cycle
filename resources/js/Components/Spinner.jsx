@@ -1,7 +1,7 @@
-export function Spinner() {
+export function Spinner({ color = "text-white", size = "h-5 w-5" }) {
     return (
         <svg
-            className="animate-spin h-5 w-5 text-white inline-block"
+            className={`animate-spin ${size} ${color} inline-block`}
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"

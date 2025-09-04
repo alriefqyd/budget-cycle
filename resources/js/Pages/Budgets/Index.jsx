@@ -15,7 +15,7 @@ export default function Budgets() {
     const [projectState, setProjectState] = useState(projects);
     const [modalType, setModalType] = useState('excel')
     const [showModal, setShowModal] = useState(false);
-    const [loading, setLoading] = useState(false);  // <-- loading state
+    const [loading, setLoading] = useState(false);
     const [shouldReload, setShouldReload] = useState(false);
     let existingStartYear = projects.map(function (item) {
         return item.start_year

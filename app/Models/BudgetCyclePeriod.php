@@ -9,7 +9,8 @@ class BudgetCyclePeriod extends Model
 {
     protected $guarded = ['id'];
 
-    public function projects(){
-        return $this->hasMany(Project::class);
+    public function projects() {
+        return $this->hasMany(Projects::class, 'budget_cycle_period_id', 'id');
     }
+
 }

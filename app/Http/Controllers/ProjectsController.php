@@ -9,12 +9,14 @@ use App\Exports\BudgetCyclePlanExport;
 use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
+use App\Jobs\DuplicateBudgetPeriodJob;
 use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
 use App\Services\ProjectsService;
+use DebugBar\DebugBar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -37,10 +39,13 @@ class ProjectsController extends Controller
     {
         $projectService = new ProjectsService;
         $budgets = $projectService->getBudgetsByYear($year, null);
-
+        $versions = $projectService->getVersionListByYear($year);
+        $budgetVersion = BudgetCyclePeriod::where('start_year', $year)->orderBy('version', 'desc')->first();
         return Inertia::render('Budgets/Show', [
             'year' => $year,
             'budgets' => $budgets,
+            'versions' => $versions,
+            'budgetVersion' => $budgetVersion
         ]);
     }
 
@@ -297,18 +302,51 @@ class ProjectsController extends Controller
         return response()->json(['message' => 'Budgets deleted.']);
     }
 
-    public function finalize($year){
-        try{
-            $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->firstOrFail();
-            $budgetPeriod->version = $budgetPeriod->version + 1;
-            $budgetPeriod->approval_status = ApprovalStatus::APPROVED;
+    public function finalize($year, $version){
+        try {
+            if(!isset($version)){
+                $version = 0;
+            }
+            $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
+            $budgetPeriod->approval_status = ApprovalStatus::SUBMISSION;
+
             $budgetPeriod->save();
             $projectService = new ProjectsService();
+            $projectService->duplicateDataFinalize($budgetPeriod->id);
             $projectService->updateBudgetList($year);
             return response()->json(['message' => 'Budgets finalize.','status' => 200]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         }
+    }
 
+    public function getBudgetByYearAndVersion($year, $version){
+        try {
+            $projectService = new ProjectsService;
+            $budgets = $projectService->getBudgetsByYear($year, null, $version);
+
+            return response()->json([
+                'status' => 200,
+                'year' => $year,
+                'version' => $version,
+                'budgets' => $budgets,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
+    public function getVersionList($year){
+        try {
+            $projectService = new ProjectsService;
+            $versions = $projectService->getVersionListByYear($year);
+            return response()->json([
+                'status' => 200,
+                'year' => $year,
+                'data' => $versions,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
     }
 }
