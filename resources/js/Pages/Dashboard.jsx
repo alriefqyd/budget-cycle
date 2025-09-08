@@ -11,18 +11,20 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 import BarChart from "@/Components/BarChart.jsx";
 import BarChartCostCash from "@/Components/BarChartCostCash.jsx";
 import PieChartCategory from "@/Components/PieChartCategory.jsx";
-import FloatingChart from "@/Components/FloatingChart.jsx"; // for module use
+import FloatingChart from "@/Components/FloatingChart.jsx";
+import {Spinner} from "@/Components/Spinner.jsx"; // for module use
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
 
 
 export default function Dashboard() {
-    const { dataChart, dataCostCash5yp, pieChart, floatingChart } = usePage().props
+    const { dataChart, dataCostCash5yp, pieChart, floatingChart, versions, defaultVersion } = usePage().props
     const [dataChartDashboard, setDataChartDashboard] = useState(dataChart)
     const [dataChartCostCash, setDataChartCostCash] = useState(dataCostCash5yp)
     const [dataCategory, setDataCategory] = useState(pieChart)
     const [dataByDirectorate, setDataByDirectorate] = useState(floatingChart);
-
+    const [version, setVersion] = useState(defaultVersion);
+    const [loading, setLoading] = useState(false);
     // this will update data chart if broadcast exist
     useEffect(() => {
         const channel = window.Echo.channel('dashboard')
@@ -44,6 +46,30 @@ export default function Dashboard() {
         };
     }, []);
 
+    const handleVersionChange = async (e) => {
+        const selectedVersion = e.target.value;
+        setVersion(selectedVersion);
+        setLoading(true)
+
+        const response = await axios({
+            method: 'get',
+            url: `/getDashboardByVersion/`,
+            params: {
+                year: 2026,
+                version: selectedVersion
+            }, // axios will handle JSON automatically
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        setDataChartDashboard(response.data.dataChart)
+        setDataChartCostCash(response.data.dataCostCash5yp)
+        setDataCategory(response.data.pieChart)
+        setDataByDirectorate(response.data.floatingChart)
+        setLoading(false)
+    }
+
     return (
         <AuthenticatedLayout
             header={
@@ -53,6 +79,25 @@ export default function Dashboard() {
             }
         >
             <Head title="Dashboard"/>
+            <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-600">Version:</label>
+                <select
+                    value={version}
+                    onChange={handleVersionChange}
+                    className="border border-gray-300 rounded-lg px-7 py-2 text-sm focus:ring focus:ring-yellow-400"
+                >
+                    {
+                        versions.map((ver) => (
+                            <option key={ver.version} value={ver.version}>
+                                {`v${ver.version}`}
+                            </option>
+                        ))
+                    }
+                </select>
+                {
+                    loading && <Spinner color="text-green-800"></Spinner>
+                }
+            </div>
             <ContainerWrapper>
                 <BarChart chartName="chart5YP" dataChart={dataChartDashboard} />
 

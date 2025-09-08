@@ -15,6 +15,7 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', [\App\Http\Controllers\HomeController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/getDashboardByVersion', [\App\Http\Controllers\HomeController::class, 'getDashboardByVersion'])->middleware(['auth', 'verified'])->name('dashboard');
 Route::get('/budgets', [\App\Http\Controllers\ProjectsController::class, 'index'])->middleware(['auth'])->name('budget-list');
 Route::get('/budgets/{year}', [\App\Http\Controllers\ProjectsController::class, 'show'])->middleware(['auth'])->name('budget-show');
 Route::post('/budgets/upload', [\App\Http\Controllers\ProjectsController::class, 'upload'])->middleware(['auth'])->name('budget-upload');

@@ -16,6 +16,8 @@ class HomeController extends Controller
         $dataChart5Yp = $this->getData5yp($year);
         $pieChart = $this->getProjectByType($year);
         $floatingChart = $this->getProjectByDirectorate($year);
+        $versions =  BudgetCyclePeriod::where('start_year',$year)->get();
+        $defaultVersion = $versions->max('version');
 
         return Inertia::render('Dashboard',
         [
@@ -23,19 +25,45 @@ class HomeController extends Controller
             'dataCostCash5yp' => $dataChart5Yp,
             'pieChart' => $pieChart,
             'floatingChart' => $floatingChart,
+            'versions' => $versions,
+            'defaultVersion' => $defaultVersion,
         ]);
     }
 
-    public function getData5yp($startYear){
+    public function getDashboardByVersion(Request $request){
+        $year = $request->year;
+        $version = $request->version;
+        $dataChart = $this->getCashCostYearly($year, $version);
+        $dataChart5Yp = $this->getData5yp($year, $version);
+        $pieChart = $this->getProjectByType($year, $version);
+        $floatingChart = $this->getProjectByDirectorate($year, $version);
+
+        return response()->json([
+            'dataChart' => $dataChart,
+            'dataCostCash5yp' => $dataChart5Yp,
+            'pieChart' => $pieChart,
+            'floatingChart' => $floatingChart,
+        ]);
+    }
+
+    public function getData5yp($startYear, $version = null){
         $costArr = [];
         $cashArr = [];
         $label = [];
+
+        $latestVersion = $version ?? BudgetCyclePeriod::where('start_year',$startYear)->max('version');
+
         foreach (range($startYear, $startYear + 4) as $index => $year) {
-            $cashPlan = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
+            $cashPlan = Projects::with(['cashCostYearlies'])
+                ->whereHas('budgetCyclePeriod', function ($query) use ($latestVersion) {
+                    $query->where('version',$latestVersion);
+                })->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
                 return $item->cashCostYearlies->where('type', 'cash')->where('year', $year)->sum('amount');
             });
 
-            $costPlan = Projects::with('cashCostYearlies')->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
+            $costPlan = Projects::with(['cashCostYearlies','budgetCyclePeriod'])->whereHas('budgetCyclePeriod', function ($query) use ($latestVersion) {
+                $query->where('version',$latestVersion);
+            })->where('year_period', $startYear)->get()->sum(function ($item) use ($year) {
                 return $item->cashCostYearlies->where('type', 'cost')->where('year', $year)->sum('amount');
             });
 
@@ -55,7 +83,7 @@ class HomeController extends Controller
         ];
     }
 
-    public function getCashCostYearly($startYear)
+    public function getCashCostYearly($startYear, $version = null)
     {
         $planArr = [];
         $totalPlan5yp = [];
@@ -63,8 +91,8 @@ class HomeController extends Controller
         $approvedArr = [];
         $label = [];
         $lastYear = [150000000, 200281789, 194704553, 178882078, 104596538, 0];
-        
-        $latestVersion = BudgetCyclePeriod::where('start_year',$startYear)->max('version');
+
+        $latestVersion = $version ?? BudgetCyclePeriod::where('start_year',$startYear)->max('version');
         $projects = Projects::with(['cashCostYearlies','budgetCyclePeriod'])
             ->whereHas('budgetCyclePeriod', function ($query) use ($latestVersion) {
                 $query->where('version',$latestVersion);
@@ -107,12 +135,16 @@ class HomeController extends Controller
             'plan' => $planArr,
             'approved5yp' => $totalApprove5yp,
             'plan5yp' => $totalPlan5yp,
+            'year' => $startYear
         ];
     }
 
 
-    public function getProjectByType($year){
-        $data = Projects::with('cashCostYearlies')->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
+    public function getProjectByType($year, $version = null){
+        $latestVersion = $version ?? BudgetCyclePeriod::where('start_year',$year)->max('version');
+        $data = Projects::with(['cashCostYearlies','budgetCyclePeriod'])->whereHas('budgetCyclePeriod', function ($query) use ($latestVersion) {
+            $query->where('version',$latestVersion);
+        })->where('year_period',$year)->whereNot('status_progress','CAP')->whereHas('cashCostYearlies', function ($query) use ($year) {
             return $query->where('year', $year)->whereNotNull('amount')->where('amount','>',0);
         })->get()->groupBy('status_progress')->map(function ($items, $key) use ($year) {    return [
                 'label' => $key,
@@ -125,14 +157,18 @@ class HomeController extends Controller
         return $data;
     }
 
-    public function getProjectByDirectorate($year)
+    public function getProjectByDirectorate($year, $version = null)
     {
         $arrLabel = [];
         $arrBudget = [];
         $arrCount = [];
+        $latestVersion = $version ?? BudgetCyclePeriod::where('start_year',$year)->max('version');
 
-        $data = Projects::with('cashCostYearlies')
+        $data = Projects::with(['cashCostYearlies','budgetCyclePeriod'])
             ->where('year_period', $year)
+            ->whereHas('budgetCyclePeriod', function ($query) use ($latestVersion) {
+                $query->where('version',$latestVersion);
+            })
             ->whereNot('status_progress', 'CAP')
             ->whereHas('cashCostYearlies', function ($query) use ($year) {
                 return $query->where('year', $year)
