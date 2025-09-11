@@ -70,7 +70,7 @@ export default function Show() {
     const [selectedRowsState, setSelectedRowsState] = useState([]);
     const [budgetTotalYear, setBudgetTotalYear] = useState(0);
     const [loadingFinalize, setLoadingFinalize] = useState(false)
-    const [isLatestVersion, setIsLatestVersion] = useState(false);
+    const [isLatestVersion, setIsLatestVersion] = useState(true);
 
     useEffect(() => {
         fetchVersionList();
