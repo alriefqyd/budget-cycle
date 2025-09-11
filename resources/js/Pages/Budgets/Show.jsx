@@ -70,6 +70,7 @@ export default function Show() {
     const [selectedRowsState, setSelectedRowsState] = useState([]);
     const [budgetTotalYear, setBudgetTotalYear] = useState(0);
     const [loadingFinalize, setLoadingFinalize] = useState(false)
+    const [isLatestVersion, setIsLatestVersion] = useState(false);
 
     useEffect(() => {
         fetchVersionList();
@@ -543,6 +544,7 @@ export default function Show() {
         if(response.status === 200) {
             setRowData(response.data.budgets);
             setLoading(false)
+            setIsLatestVersion(e.target.value == response.data.latestVersion);
         } else {
             Swal.fire('Error', response.message, 'warning');
             setLoading(false)
@@ -1344,7 +1346,11 @@ export default function Show() {
                             ref={agGridRef}
                             rowData={rowData}
                             columnDefs={columnDefs}
-                            defaultColDef={defaultColDef}
+                            defaultColDef={{
+                                ...defaultColDef,
+                                editable: isLatestVersion,   // <--- globally disable editing
+                            }}
+                            suppressClickEdit={!isLatestVersion}  // <--- prevent entering edit mode
                             // pagination={true}
                             // paginationPageSize={20}
                             onCellValueChanged={onCellValueChanged}

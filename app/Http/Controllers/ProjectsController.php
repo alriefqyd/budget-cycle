@@ -324,12 +324,15 @@ class ProjectsController extends Controller
         try {
             $projectService = new ProjectsService;
             $budgets = $projectService->getBudgetsByYear($year, null, $version);
+            $versions =  BudgetCyclePeriod::where('start_year',$year)->get();
+            $latestVersion = $versions->max('version');
 
             return response()->json([
                 'status' => 200,
                 'year' => $year,
                 'version' => $version,
                 'budgets' => $budgets,
+                'latestVersion' => $latestVersion
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);
