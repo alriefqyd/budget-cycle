@@ -22,7 +22,14 @@ class ProjectsService
     }
     public function getDataProjectIndex()
     {
-        $projects = Projects::with(['budgets','cashCostYearlies'])->get();
+        $projects = Projects::with(['budgets', 'cashCostYearlies', 'budgetCyclePeriod'])
+            ->whereHas('budgetCyclePeriod', function ($query) {
+                $query->where('version', function ($sub) {
+                    $sub->selectRaw('MAX(version)')
+                        ->from('budget_cycle_periods');
+                });
+            })
+            ->get();
 
         // Group by year_period
         $grouped = $projects->groupBy('year_period');
