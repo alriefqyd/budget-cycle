@@ -27,6 +27,7 @@ class HomeController extends Controller
             'floatingChart' => $floatingChart,
             'versions' => $versions,
             'defaultVersion' => $defaultVersion,
+            'year' => $year,
         ]);
     }
 

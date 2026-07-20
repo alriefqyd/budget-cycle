@@ -28,6 +28,7 @@
     "@inertiajs/progress": "^0.2.7",
     "ag-charts-react": "^11.3.2",
     "ag-grid-community": "^33.3.0",
+    "ag-grid-enterprise": "^34.2.0",
     "ag-grid-react": "^33.3.0",
     "chart.js": "^4.5.0",
     "chartjs-plugin-datalabels": "^2.2.0",

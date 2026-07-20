@@ -9,14 +9,12 @@ use App\Exports\BudgetCyclePlanExport;
 use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
-use App\Jobs\DuplicateBudgetPeriodJob;
 use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
 use App\Services\ProjectsService;
-use DebugBar\DebugBar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -192,10 +190,18 @@ class ProjectsController extends Controller
     {
         try {
             DB::beginTransaction();
-            $project = Projects::with(['budgets','cashCostYearlies'])->findOrFail($id);
+            $project = Projects::with(['budgets','cashCostYearlies','budgetCyclePeriod'])->findOrFail($id);
+            $projectService = new ProjectsService();
+            if (!$projectService->isLatestVersion($project)) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This budget cycle version is locked and can no longer be edited.',
+                    'data' => false
+                ], 423);
+            }
             $project->update($request->all());
             $budget = $project->budgets;
-            $projectService = new ProjectsService();
             if($budget){
                 $budget->update($request->all());
             } else {
@@ -289,7 +295,15 @@ class ProjectsController extends Controller
             return response()->json(['message' => 'Invalid ids.'], 400);
         }
 
-        $projects = Projects::with(['budgets', 'cashCostYearlies'])->whereIn('id', $ids)->get();
+        $projects = Projects::with(['budgets', 'cashCostYearlies', 'budgetCyclePeriod'])->whereIn('id', $ids)->get();
+
+        $lockedIds = $projects->reject(fn ($project) => $projectService->isLatestVersion($project))->pluck('id')->values();
+        if ($lockedIds->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Cannot delete projects belonging to a locked (non-latest) budget cycle version.',
+                'locked_ids' => $lockedIds,
+            ], 423);
+        }
 
         foreach ($projects as $project) {
             $project->budgets()->delete();

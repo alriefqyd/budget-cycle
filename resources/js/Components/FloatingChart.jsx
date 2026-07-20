@@ -7,6 +7,7 @@ import {
     Tooltip,
     Legend
 } from "chart.js";
+import EmptyChartState from "@/Components/EmptyChartState.jsx";
 
 Chart.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -82,9 +83,9 @@ const createWaterfallData = (steps, colors) => {
 };
 
 
-export default function WaterfallComparison({dataChart}) {
+export default function WaterfallComparison({dataChart, year}) {
 
-    console.log(dataChart)
+    const hasData = (dataChart.budget ?? []).some(value => Number(value) > 0);
     const catChartRef = useRef(null);
     const ownerInitialRef = useRef(null);
     const catChartInstance = useRef(null);
@@ -96,6 +97,8 @@ export default function WaterfallComparison({dataChart}) {
         [catChartInstance, ownerInitialInstance, ownerPreCRCInstance].forEach((ref) => {
             if (ref.current) ref.current.destroy();
         });
+
+        if (!hasData) return;
 
         // ===== By Owner Area =====
         const ownerLabels = dataChart.label;
@@ -140,13 +143,17 @@ export default function WaterfallComparison({dataChart}) {
     }, [dataChart]);
 
     return (
-        <div className="card bg-white shadow-lg rounded-lg p-6">
-            {/* By Owner Area */}
-            <h2 className="text-lg font-bold mt-10 mb-4">By Owner Area</h2>
-            <div className="grid grid-cols-1 gap-4">
-                <div>
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-primary px-container-padding py-4 flex items-center gap-3">
+                <span className="material-symbols-outlined text-white">table_chart</span>
+                <h4 className="font-title-sm text-title-sm text-white font-bold">Budget by Owner Area</h4>
+            </div>
+            <div className="p-6">
+                {hasData ? (
                     <canvas ref={ownerInitialRef} height="120"></canvas>
-                </div>
+                ) : (
+                    <EmptyChartState year={year} />
+                )}
             </div>
         </div>
     );

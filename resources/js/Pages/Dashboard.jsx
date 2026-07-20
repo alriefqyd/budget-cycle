@@ -1,8 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import {Head, usePage} from '@inertiajs/react';
-import StatCard from "@/Components/StatCard.jsx";
-import CardWrapper from "@/Components/CardWrapper.jsx";
-import ContainerWrapper from "@/Components/ContainerWrapper.jsx";
 import { AgCharts } from 'ag-charts-react';
 import {useEffect, useState} from "react";
 import { Bar } from 'react-chartjs-2';
@@ -18,7 +15,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 
 
 export default function Dashboard() {
-    const { dataChart, dataCostCash5yp, pieChart, floatingChart, versions, defaultVersion } = usePage().props
+    const { dataChart, dataCostCash5yp, pieChart, floatingChart, versions, defaultVersion, year } = usePage().props
     const [dataChartDashboard, setDataChartDashboard] = useState(dataChart)
     const [dataChartCostCash, setDataChartCostCash] = useState(dataCostCash5yp)
     const [dataCategory, setDataCategory] = useState(pieChart)
@@ -38,7 +35,6 @@ export default function Dashboard() {
                 setDataChartCostCash(newDataCostCash);
                 setDataCategory(newDataCategory);
                 setDataByDirectorate(newDataByDirectorate);
-                console.log(newDataByDirectorate)
             });
 
         return () => {
@@ -55,7 +51,7 @@ export default function Dashboard() {
             method: 'get',
             url: `/getDashboardByVersion/`,
             params: {
-                year: 2026,
+                year: year,
                 version: selectedVersion
             }, // axios will handle JSON automatically
             headers: {
@@ -71,44 +67,62 @@ export default function Dashboard() {
     }
 
     return (
-        <AuthenticatedLayout
-            header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Dashboard
-                </h2>
-            }
-        >
+        <AuthenticatedLayout>
             <Head title="Dashboard"/>
-            <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-gray-600">Version:</label>
-                <select
-                    value={version}
-                    onChange={handleVersionChange}
-                    className="border border-gray-300 rounded-lg px-7 py-2 text-sm focus:ring focus:ring-yellow-400"
-                >
-                    {
-                        versions.map((ver) => (
-                            <option key={ver.version} value={ver.version}>
-                                {`v${ver.version}`}
-                            </option>
-                        ))
-                    }
-                </select>
-                {
-                    loading && <Spinner color="text-green-800"></Spinner>
-                }
-            </div>
-            <ContainerWrapper>
-                <BarChart chartName="chart5YP" dataChart={dataChartDashboard} />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <BarChartCostCash cols={6} dataChart={dataChartCostCash} />
-                    <PieChartCategory cols={6} dataChart={dataCategory} />
+            <div className="space-y-stack-md">
+                {/* Page Header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-stack-md gap-stack-md">
+                    <div>
+                        <nav className="flex items-center text-on-surface-variant text-xs mb-2 gap-1">
+                            <span>Planning</span>
+                            <span className="material-symbols-outlined text-sm">chevron_right</span>
+                            <span className="text-primary font-bold">Budget Forecast {year} - {parseInt(year) + 4}</span>
+                        </nav>
+                        <h2 className="font-display-lg text-display-lg font-black text-on-surface flex items-center gap-3">
+                            Budget Forecast {year} - {parseInt(year) + 4}
+                            {String(version) === String(defaultVersion) && (
+                                <span className="bg-primary-container text-on-primary-container text-[12px] px-3 py-1 rounded-full font-bold">LIVE VERSION</span>
+                            )}
+                        </h2>
+                    </div>
+                    <div className="flex items-center gap-stack-sm">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-surface-container-high rounded-lg border border-outline-variant">
+                            <span className="text-xs font-bold text-on-surface-variant">VERSION:</span>
+                            <select
+                                value={version}
+                                onChange={handleVersionChange}
+                                className="bg-transparent border-none focus:ring-0 text-sm font-bold text-primary p-0"
+                            >
+                                {versions.map((ver) => (
+                                    <option key={ver.version} value={ver.version}>
+                                        {`v${ver.version}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        {loading && <Spinner color="text-primary" />}
+                    </div>
                 </div>
-                <div className="grid grid-cols-1">
-                    <FloatingChart dataChart={dataByDirectorate}/>
+
+                {/* Bento Grid Content */}
+                <div className="grid grid-cols-12 gap-gutter">
+                    <div className="col-span-12">
+                        <BarChart chartName="chart5YP" dataChart={dataChartDashboard} year={year} />
+                    </div>
+
+                    <div className="col-span-12 lg:col-span-6">
+                        <BarChartCostCash dataChart={dataChartCostCash} year={year} />
+                    </div>
+                    <div className="col-span-12 lg:col-span-6">
+                        <PieChartCategory dataChart={dataCategory} year={year} />
+                    </div>
+
+                    <div className="col-span-12">
+                        <FloatingChart dataChart={dataByDirectorate} year={year} />
+                    </div>
                 </div>
-            </ContainerWrapper>
+            </div>
         </AuthenticatedLayout>
     );
 }

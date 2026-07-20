@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
     nginx:
         container_name: nginx_budget_cycle
         image: nginx:alpine
         ports:
-            - "4040:80"
+            - "4041:80"
         depends_on:
             - app
             - db

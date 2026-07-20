@@ -21,12 +21,11 @@ Route::get('/budgets/{year}', [\App\Http\Controllers\ProjectsController::class, 
 Route::post('/budgets/upload', [\App\Http\Controllers\ProjectsController::class, 'upload'])->middleware(['auth'])->name('budget-upload');
 Route::post('/export/budgets', [\App\Http\Controllers\ProjectsController::class, 'export'])->middleware(['auth'])->name('budget-detail-upload');
 Route::post('/budgets/import-project', [\App\Http\Controllers\ProjectsController::class, 'uploadProject'])->middleware(['auth'])->name('budget-upload-detail');
-Route::post('/budgets/create', [\App\Http\Controllers\ProjectsController::class, 'create'])->middleware(['auth'])->name('budget-upload');
+Route::post('/budgets/create', [\App\Http\Controllers\ProjectsController::class, 'create'])->middleware(['auth'])->name('budget-create-period');
 Route::put('/budgets/{id}', [\App\Http\Controllers\ProjectsController::class, 'update'])->middleware(['auth'])->name('budget-update');
-Route::put('/budgets/{id}', [\App\Http\Controllers\ProjectsController::class, 'update'])->middleware(['auth'])->name('budget-update');
-Route::put('/budgets-finalize/{year}/{version}', [\App\Http\Controllers\ProjectsController::class, 'finalize'])->middleware(['auth'])->name('budget-update');
-Route::get('/budgets-version/{year}/{version}', [\App\Http\Controllers\ProjectsController::class, 'getBudgetByYearAndVersion'])->middleware(['auth'])->name('budget-update');
-Route::get('/budgets-versions/{year}/', [\App\Http\Controllers\ProjectsController::class, 'getVersionList'])->middleware(['auth'])->name('budget-update');
+Route::put('/budgets-finalize/{year}/{version}', [\App\Http\Controllers\ProjectsController::class, 'finalize'])->middleware(['auth'])->name('budget-finalize');
+Route::get('/budgets-version/{year}/{version}', [\App\Http\Controllers\ProjectsController::class, 'getBudgetByYearAndVersion'])->middleware(['auth'])->name('budget-version-show');
+Route::get('/budgets-versions/{year}/', [\App\Http\Controllers\ProjectsController::class, 'getVersionList'])->middleware(['auth'])->name('budget-version-list');
 Route::post('/budgets/', [\App\Http\Controllers\ProjectsController::class, 'store'])->middleware(['auth'])->name('budget-create');
 Route::delete('/budgets', [\App\Http\Controllers\ProjectsController::class, 'destroy'])->middleware(['auth'])->name('budget-delete');
 Route::post('/budgets/duplicate', [\App\Http\Controllers\ProjectsController::class, 'duplicate'])->middleware(['auth'])->name('budget-duplicate');

@@ -1,12 +1,10 @@
 import {useEffect, useState, useRef, useMemo} from "react"
 import {Link, usePage} from "@inertiajs/react"
 import { AgGridReact } from "ag-grid-react"
-import "../../../css/ag-grid-custom.css";
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+import "../../../css/ag-grid-custom.css";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.jsx"
-import ContainerWrapper from "@/Components/ContainerWrapper.jsx"
-import CardWrapper from "@/Components/CardWrapper.jsx"
 
 import {
     ModuleRegistry,
@@ -71,6 +69,7 @@ export default function Show() {
     const [budgetTotalYear, setBudgetTotalYear] = useState(0);
     const [loadingFinalize, setLoadingFinalize] = useState(false)
     const [isLatestVersion, setIsLatestVersion] = useState(true);
+    const [showFilters, setShowFilters] = useState(false);
 
     useEffect(() => {
         fetchVersionList();
@@ -182,7 +181,11 @@ export default function Show() {
 
 
     const columnDefs = [
-        { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:false},
+        { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:false,
+            cellDataType: 'text',
+            colSpan: params => params.node.rowPinned ? 3 : 1,
+            cellStyle: params => params.node.rowPinned ? { textAlign: 'right', fontWeight: 700 } : null,
+        },
         { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true,
             headerCheckboxSelection: true},
         { headerName: "Project's Title", field: "project_title",pinned:'left', width: 300},
@@ -444,6 +447,7 @@ export default function Show() {
         resizable: true,
         sortable: true,
         filter: true,
+        floatingFilter: showFilters,
         flex: 1,
         minWidth: 120,
         editable: true,
@@ -593,12 +597,7 @@ export default function Show() {
             }
         }
 
-        setRowData(prev => ({
-            ...prev,
-            data: newRow
-        }));
-
-        agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
+        setRowData(prev => [newRow, ...prev]);
     };
 
     const handleDuplicateRow = async () => {
@@ -647,6 +646,7 @@ export default function Show() {
 
     const calculateTotals = (rowData) => {
         let totals = {
+            id: 'Total (USD)',
             sap_code: 'Total',
             title: '',
             total_cash:0,
@@ -1022,27 +1022,6 @@ export default function Show() {
                 alert("An error occurred while updating the data. Please try again.");
             }
 
-            // if (isNew && result.data?.id) {
-            //     data.id = result.data.id;
-            //     lastUpdatedId.current = data.id;
-            //     agGridRef.current.api.applyTransaction({ update: [data] });
-            // }
-
-            // if (isNew && result.data?.id) {
-            //     // Remove the old row with `id: null`
-            //     agGridRef.current.api.applyTransaction({ remove: [params.data] });
-            //
-            //     // Assign new ID and re-add it
-            //     const newRow = {
-            //         ...data,
-            //         id: result.data.id
-            //     };
-            //
-            //     lastUpdatedId.current = newRow.id;
-            //
-            //     agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
-            // }
-
             if (isNew && result.data?.id) {
                 agGridRef.current.api.applyTransaction({ remove: [params.data] });
                 const newRow = { ...data, id: result.data.id };
@@ -1197,108 +1176,107 @@ export default function Show() {
     const agGridRef = useRef(); // <--- Add this
 
     return (
-        <AuthenticatedLayout
-            header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Dashboard
-                </h2>
-            }
-        >
-            <ContainerWrapper>
+        <AuthenticatedLayout>
+            <div className="flex flex-col gap-stack-md">
 
-                <nav className="flex items-center text-sm text-gray-500 mb-5" aria-label="Breadcrumb">
-                    <ol className="inline-flex items-center space-x-1">
-                        <li className="inline-flex items-center">
-                            <Link href={'/dashboard'} className="text-gray-500 hover:text-gray-700">
-                                Dashboard
-                            </Link>
-                        </li>
-                        <li>
-                            <span className="mx-2 text-gray-400">/</span>
-                            <Link href={'/budgets'} className="text-gray-500 hover:text-gray-700">
-                                Budgets
-                            </Link>
-                        </li>
-                        <li>
-                            <span className="mx-2 text-gray-400">/</span>
-                            <span className="text-gray-700 font-medium">{startYear} - {endYear}</span>
-                        </li>
-                    </ol>
+                <nav className="flex items-center gap-2 text-on-surface-variant" aria-label="Breadcrumb">
+                    <Link href={'/dashboard'} className="font-body-sm text-body-sm hover:text-primary transition-colors">
+                        Dashboard
+                    </Link>
+                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                    <Link href={'/budgets'} className="font-body-sm text-body-sm hover:text-primary transition-colors">
+                        Budgets
+                    </Link>
+                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                    <span className="font-body-sm text-body-sm font-bold text-primary">{startYear} - {endYear}</span>
                 </nav>
 
-                <div className="left">
+                {/* Page Header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-stack-md">
+                    <h2 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">Budget 5 Year Plan</h2>
 
-                </div>
-
-                <div className="float"></div>
-                <div className="mb-1">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        {/* Left side buttons */}
-                        <div className="flex gap-1 flex-wrap">
-                            <button
-                                onClick={() => setShowModal(true)}
-                                className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
-                            >
-                                Import Data
-                            </button>
-                            <button
-                                onClick={handleExport}
-                                className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
-                            >
-                                {loading ? (
-                                    <>
-                                        <Spinner/>
-                                        <span className="ml-2">Export Data...</span>
-                                    </>
-                                ) : (
-                                    'Export Data'
-                                )}
-                            </button>
-                        </div>
-
-                        {/* Right side buttons */}
-                        <div className="flex gap-2 flex-wrap">
-                            <button
-                                onClick={handleDelete}
-                                className="inline-flex items-center px-3 py-2 bg-red-800 text-white text-sm font-medium rounded-lg shadow hover:bg-red-700 transition"
-                            >
-                                🗑️ Delete Data
-                            </button>
-                            <button
-                                onClick={handleDuplicateRow}
-                                className="inline-flex items-center px-3 py-2 bg-yellow-500 text-white text-sm font-medium rounded-lg shadow hover:bg-yellow-600 transition"
-                            >
-                                ⧉ Duplicate
-                            </button>
-                            <button
-                                onClick={handleFullscreen}
-                                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg shadow hover:bg-blue-700 transition"
-                            >
-                                ⛶ Full Screen
-                            </button>
-                        </div>
+                    {/* Contextual Toolbar */}
+                    <div className="flex flex-wrap items-center gap-stack-sm">
+                        <button
+                            onClick={() => setShowFilters(prev => !prev)}
+                            className={`inline-flex items-center gap-2 px-stack-md py-2 border rounded-lg font-label-caps text-label-caps transition-all active:scale-95 shadow-sm ${
+                                showFilters
+                                    ? "bg-primary-container text-on-primary-container border-transparent"
+                                    : "border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container"
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[18px] opacity-70">
+                                {showFilters ? "filter_alt_off" : "filter_alt"}
+                            </span>
+                            {showFilters ? "Hide Filters" : "Show Filters"}
+                        </button>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="inline-flex items-center gap-2 px-stack-md py-2 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container transition-all active:scale-95 shadow-sm"
+                        >
+                            <span className="material-symbols-outlined text-[18px] opacity-70">upload</span>
+                            Import Data
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="inline-flex items-center gap-2 px-stack-md py-2 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container transition-all active:scale-95 shadow-sm"
+                        >
+                            {loading ? (
+                                <>
+                                    <Spinner color="text-primary"/>
+                                    <span>Export Data...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-[18px] opacity-70">download</span>
+                                    Export Data
+                                </>
+                            )}
+                        </button>
+                        <div className="h-6 w-px bg-outline-variant mx-1"></div>
+                        <button
+                            onClick={handleDelete}
+                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-error/10 text-error border border-error/20 rounded-lg font-label-caps text-label-caps hover:bg-error/20 transition-all active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                            Delete Data
+                        </button>
+                        <button
+                            onClick={handleDuplicateRow}
+                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-secondary/10 text-secondary border border-secondary/20 rounded-lg font-label-caps text-label-caps hover:bg-secondary/20 transition-all active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                            Duplicate
+                        </button>
+                        <button
+                            onClick={handleFullscreen}
+                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-primary-container text-on-primary-container rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-95 shadow-sm"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">fullscreen</span>
+                            Full Screen
+                        </button>
                     </div>
                 </div>
 
-                <CardWrapper mb="mb-3">
-                    <div className="flex items-center justify-between">
-                        {/* Tabs Section */}
-                        <div className="flex space-x-4">
+                {/* Tab Container */}
+                <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden border border-outline-variant">
+                    <div className="flex flex-wrap items-center justify-between gap-stack-md px-container-padding py-stack-md border-b border-outline-variant bg-white">
+                        <div className="flex items-center p-1 bg-surface-container rounded-xl">
                             <button
-                                className={`px-4 py-2 ${
+                                className={`px-5 py-2 rounded-lg font-label-caps text-label-caps transition-all active:scale-95 ${
                                     activeTab === "Tab1"
-                                        ? "border-b-2 border-yellow-500 text-teal-700 font-semibold"
-                                        : ""
+                                        ? "bg-white text-primary font-bold shadow-sm"
+                                        : "text-on-surface-variant hover:text-primary font-medium"
                                 }`}
                                 onClick={() => setActiveTab("Tab1")}
                             >
                                 Budget 5 Years
                             </button>
                             <button
-                                className={`px-4 py-2 ${
+                                className={`px-5 py-2 rounded-lg font-label-caps text-label-caps transition-all active:scale-95 ${
                                     activeTab === "Tab2"
-                                        ? "border-b-2 border-yellow-500 text-teal-700 font-semibold"
-                                        : ""
+                                        ? "bg-white text-primary font-bold shadow-sm"
+                                        : "text-on-surface-variant hover:text-primary font-medium"
                                 }`}
                                 onClick={() => setActiveTab("Tab2")}
                             >
@@ -1306,12 +1284,11 @@ export default function Show() {
                             </button>
                         </div>
 
-                        {/* Right Side: Actions */}
-                        <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2">
-                                <label className="text-sm font-medium text-gray-700">Version:</label>
+                        <div className="flex items-center gap-stack-md">
+                            <div className="flex items-center gap-2 text-on-surface-variant">
+                                <span className="font-label-caps text-label-caps">Version:</span>
                                 <select
-                                    className="border rounded-lg px-5 py-1 text-sm focus:ring focus:ring-yellow-400"
+                                    className="appearance-none bg-surface border border-outline-variant rounded px-stack-md pr-8 py-1 font-data-tabular text-data-tabular focus:ring-1 focus:ring-primary outline-none"
                                     value={versionBudgetPeriod}
                                     onChange={handleChangeVersion}
                                 >
@@ -1325,46 +1302,56 @@ export default function Show() {
 
                             <button
                                 onClick={handleFinalize}
-                                className="inline-flex items-center px-3 py-2 bg-green-800 text-white text-sm font-medium rounded-lg shadow hover:bg-green-700 transition"
+                                className="inline-flex items-center gap-2 px-stack-md py-2 bg-tertiary-container text-on-tertiary-container rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-95"
                             >
+                                <span className="material-symbols-outlined text-[18px]">task_alt</span>
                                 Finalize Budget Cycle
                             </button>
                         </div>
                     </div>
-                </CardWrapper>
 
-                <CardWrapper>
                     {loading ? (
-                        <>
-                            <div className="col-md-12 p-2">
-                                <Spinner/>
-                                Loading data, please wait...</div>
-                        </>
-                    ) :  <div ref={gridRef} className="ag-theme-alpine"
-                              style={{height: "calc(100vh - 150px)", width: "100%"}}>
-                        <AgGridReact
-                            ref={agGridRef}
-                            rowData={rowData}
-                            columnDefs={columnDefs}
-                            defaultColDef={{
-                                ...defaultColDef,
-                                editable: isLatestVersion,   // <--- globally disable editing
-                            }}
-                            suppressClickEdit={!isLatestVersion}  // <--- prevent entering edit mode
-                            // pagination={true}
-                            // paginationPageSize={20}
-                            onCellValueChanged={onCellValueChanged}
-                            rowSelection="multiple"
-                            suppressRowClickSelection={true}
-                            undoRedoCellEditing={5}
-                            undoRedoCellEditingLimit={5}
-                            onSelectionChanged={onSelectionChanged}
-                            getRowId={params => params.data.id}
-                            pinnedTopRowData={calculateTotals(rowData)}
-                        />
-                    </div> }
-                </CardWrapper>
-            </ContainerWrapper>
+                        <div className="p-6 flex items-center gap-2 text-on-surface-variant">
+                            <Spinner color="text-primary"/>
+                            Loading data, please wait...
+                        </div>
+                    ) : (
+                        <div ref={gridRef} className="ag-theme-alpine"
+                             style={{height: "calc(100vh - 260px)", width: "100%"}}>
+                            <AgGridReact
+                                ref={agGridRef}
+                                rowData={rowData}
+                                columnDefs={columnDefs}
+                                defaultColDef={{
+                                    ...defaultColDef,
+                                    editable: isLatestVersion,   // <--- globally disable editing
+                                }}
+                                suppressClickEdit={!isLatestVersion}  // <--- prevent entering edit mode
+                                // pagination={true}
+                                // paginationPageSize={20}
+                                onCellValueChanged={onCellValueChanged}
+                                rowSelection="multiple"
+                                suppressRowClickSelection={true}
+                                undoRedoCellEditing={5}
+                                undoRedoCellEditingLimit={5}
+                                onSelectionChanged={onSelectionChanged}
+                                getRowId={params => params.data.id}
+                                pinnedTopRowData={calculateTotals(rowData)}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {isLatestVersion && (
+                <button
+                    onClick={handleAddNewRow}
+                    title="Add new budget row"
+                    className="fixed bottom-10 right-10 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg shadow-primary/30 hover:shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-50 group"
+                >
+                    <span className="material-symbols-outlined text-2xl transition-transform group-hover:rotate-90">add</span>
+                </button>
+            )}
 
             <UploadModalDetail
                 show={showModal}
@@ -1377,8 +1364,8 @@ export default function Show() {
 
             <Modal show={loadingFinalize}>
                 <div className="flex flex-col items-center justify-center h-48 p-4 text-center">
-                    <Spinner color="text-green-800" />
-                    <p className="mt-3 text-gray-700">Loading process finalize, please wait...</p>
+                    <Spinner color="text-primary" />
+                    <p className="mt-3 text-on-surface-variant">Loading process finalize, please wait...</p>
                 </div>
             </Modal>
 

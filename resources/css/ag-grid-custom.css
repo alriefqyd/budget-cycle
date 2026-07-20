@@ -1,154 +1,227 @@
-/* AG Grid wrapper look and feel */
+/* AG Grid re-skinned to match the VALE Precision Enterprise Design System (teal/yellow, Inter) */
 .ag-theme-alpine {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.875rem; /* text-sm */
-    color: #374151; /* text-gray-700 */
-    background-color: #872525; /* bg-white */
-    border-radius: 0.5rem; /* rounded-lg */
-    overflow: hidden;
-    border: 1px solid #e5e7eb; /* border-gray-200 */
+    /* Core palette */
+    --ag-background-color: #ffffff;
+    --ag-foreground-color: #0b1c30; /* on-surface */
+    --ag-secondary-foreground-color: #3e4948; /* on-surface-variant */
+    --ag-border-color: #d3e4fe; /* surface-variant, softer than outline-variant */
+    --ag-row-border-color: #eef2f4;
+    --ag-header-background-color: #007e7a; /* primary-container */
+    --ag-header-foreground-color: #ffffff;
+    --ag-header-column-separator-display: block;
+    --ag-header-column-separator-color: rgba(255, 255, 255, 0.16);
+    --ag-header-column-separator-height: 55%;
+
+    /* Rows */
+    --ag-odd-row-background-color: #f8f9ff; /* surface */
+    --ag-row-hover-color: rgba(0, 99, 96, 0.06);
+    --ag-selected-row-background-color: rgba(0, 126, 122, 0.12);
+    --ag-range-selection-border-color: #006360;
+
+    /* Inputs / selection controls */
+    --ag-checkbox-checked-color: #006360;
+    --ag-checkbox-unchecked-color: #6e7978;
+    --ag-checkbox-background-color: #ffffff;
+    --ag-input-focus-border-color: #006360;
+    --ag-input-focus-box-shadow: 0 0 0 2px rgba(0, 99, 96, 0.18);
+
+    /* Typography */
+    --ag-font-family: 'Inter', sans-serif;
+    --ag-font-size: 13px;
+
+    /* Density */
+    --ag-cell-horizontal-padding: 16px;
+    --ag-row-height: 44px;
+    --ag-header-height: 46px;
+    --ag-list-item-height: 32px;
+
+    /* Frame: the grid already sits inside a rounded, bordered card, so keep it flush */
+    --ag-wrapper-border-radius: 0;
+    background-color: var(--ag-background-color);
+    border: none;
+    border-radius: 0;
 }
 
 /* Header */
-.custom-header-orange {
-    background-color: rgb(253, 190, 0); /* bg-gray-100 */
-    min-height: 49px !important;
-}
-.custom-header-orange-2 {
-    background-color: rgb(233, 183, 51); /* bg-gray-100 */
-    min-height: 49px !important;
+.ag-theme-alpine .ag-header {
+    font-weight: 700;
+    letter-spacing: 0.01em;
 }
 
-.custom-header-gray{
-    background-color: rgba(248, 201, 113, 0.5);
-    min-height: 49px !important;
+.ag-theme-alpine .ag-header-cell-label {
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #ffffff;
 }
 
-.custom-header-blue{
-    background-color: #2f74b4;
-    min-height: 49px !important;
+.ag-theme-alpine .ag-header-group-cell-label {
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #ffffff;
 }
 
-.custom-header-green {
-    background-color: rgb(145, 206, 79); /* bg-gray-100 */
-    min-height: 49px !important;
+.ag-theme-alpine .ag-header .ag-icon,
+.ag-theme-alpine .ag-header .ag-header-icon {
+    color: #ffffff;
+    opacity: 0.85;
 }
 
-.custom-header-red {
-    background-color: rgb(147, 25, 25); /* bg-gray-100 */
-    min-height: 49px !important;
-}
-
-.custom-header-green-2 {
-    background-color: rgb(87, 195, 90);
-    min-height: 49px !important;
-}
-
-.ag-header {
-    background-color: rgb(0, 145, 153); /* bg-gray-100 */
-    border-bottom: 1px solid #e5e7eb; /* border-gray-200 */
-    font-weight: bold;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-}
-
-.ag-header-cell .ag-header-group-cell {
-    line-height: 1.25rem;  /* leading-5 */
+.ag-theme-alpine .ag-header-cell .ag-header-group-cell {
+    line-height: 1.25rem;
     vertical-align: middle;
     height: auto !important;
 }
 
-.ag-header-cell-label {
-    font-weight: 600;
-    font-size: 0.875rem;    /* text-sm */
-    color: #ffffff;         /* text-gray-900 */
+/* Column group families — kept semantically identical (Cost / Cash / Total / monthly detail),
+   just re-tinted to the design system palette instead of raw saturated colors. */
+.custom-header-orange {
+    background-color: #8a6a00; /* deep gold — Cost family */
+    min-height: 46px !important;
 }
 
-.ag-header-group-cell-label {
-    font-weight: 600;
-    font-size: 0.875rem;
-    color: #ffffff;
+.custom-header-orange-2 {
+    background-color: #ffe8a3; /* light gold — monthly detail */
+    color: #5a4300 !important;
+    min-height: 46px !important;
+}
+.custom-header-orange-2 .ag-header-cell-label,
+.custom-header-orange-2 .ag-icon {
+    color: #5a4300 !important;
+}
+
+.custom-header-gray {
+    background-color: #c3f0d8; /* light teal — monthly cash detail */
+    color: #005236 !important;
+    min-height: 46px !important;
+}
+.custom-header-gray .ag-header-cell-label,
+.custom-header-gray .ag-icon {
+    color: #005236 !important;
+}
+
+.custom-header-blue {
+    background-color: #ffe8a3; /* light gold — monthly cost detail */
+    color: #5a4300 !important;
+    min-height: 46px !important;
+}
+.custom-header-blue .ag-header-cell-label,
+.custom-header-blue .ag-icon {
+    color: #5a4300 !important;
+}
+
+.custom-header-green {
+    background-color: #00714f; /* tertiary — Cash family */
+    min-height: 46px !important;
+}
+
+.custom-header-red {
+    background-color: #213145; /* inverse-surface — grand Total columns */
+    min-height: 46px !important;
+}
+
+.custom-header-green-2 {
+    background-color: #d7f7ea; /* light tertiary — derived "remaining" column */
+    color: #005236 !important;
+    min-height: 46px !important;
+}
+.custom-header-green-2 .ag-header-cell-label,
+.custom-header-green-2 .ag-icon {
+    color: #005236 !important;
 }
 
 /* Cells */
-.ag-cell {
-    /*padding: 0.75rem 1rem; !* Tailwind: py-3 px-4 *!*/
-    font-size: 0.875rem;   /* text-sm */
-    line-height: 1.25rem;  /* leading-5 */
-    color: #374151;        /* text-gray-700 */
+.ag-theme-alpine .ag-cell {
+    font-size: 13px;
+    line-height: 1.25rem;
+    color: #0b1c30;
     vertical-align: middle;
     white-space: nowrap;
     overflow: hidden;
-    /*text-overflow: ellipsis;*/
+    border-right: 1px solid #eef2f4;
 }
 
-/* Zebra striping */
-.ag-row:nth-child(even) {
-    background-color: #f9fafb; /* bg-gray-50 */
-}
-
-/* Row hover */
-.ag-row-hover {
-    background-color: #f3f4f6 !important; /* bg-gray-100 */
+.ag-theme-alpine .ag-cell.ag-cell-focus {
+    border: 1px solid #006360 !important;
 }
 
 /* Pagination */
-.ag-paging-panel {
-    height: 50px;
+.ag-theme-alpine .ag-paging-panel {
+    height: 52px;
     font-size: 12px;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #ffffff;
-    border-top: 1px solid #e5e7eb; /* border-gray-200 */
-    padding: 0.5rem 1rem; /* py-2 px-4 */
+    font-family: 'Inter', sans-serif;
+    color: #3e4948;
+    background-color: #eff4ff; /* surface-container-low */
+    border-top: 1px solid #d3e4fe;
+    padding: 0.5rem 1rem;
+}
+
+.ag-theme-alpine .ag-paging-button {
+    color: #006360;
+}
+
+.ag-theme-alpine .ag-paging-number {
+    font-weight: 600;
 }
 
 /* Scrollbar styling for WebKit */
-.ag-body-viewport::-webkit-scrollbar {
+.ag-theme-alpine .ag-body-viewport::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
-.ag-body-viewport::-webkit-scrollbar-thumb {
-    background-color: #d1d5db; /* gray-300 */
+.ag-theme-alpine .ag-body-viewport::-webkit-scrollbar-thumb {
+    background-color: #bdc9c7; /* outline-variant */
     border-radius: 4px;
 }
 
-/* Optional: border between columns */
-.ag-cell:not(:last-child) {
-    border-right: 1px solid #f3f4f6;
-}
-
-/* Rounded borders on outer container */
-.ag-root-wrapper {
-    border-radius: 0.5rem;
-}
-
 .ag-theme-alpine .ag-floating-filter {
-    padding: 4px 8px;
+    padding: 6px 8px;
+    background-color: #ffffff;
+}
+
+.ag-theme-alpine .ag-floating-filter-input .ag-input-field-input {
+    background-color: #eff4ff; /* surface-container-low */
+    border: none;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+}
+
+.ag-theme-alpine .ag-floating-filter-input .ag-input-field-input:focus {
+    box-shadow: 0 0 0 2px rgba(0, 99, 96, 0.18);
 }
 
 .ag-input-wrapper:before {
     display: none;
 }
 
+/* Derived / calculated cell states */
 .negative-value {
-    background-color: #ffdddd !important;
-    color: red;
-    font-weight: bold;
+    background-color: #ffdad6 !important; /* error-container */
+    color: #93000a !important;
+    font-weight: 700;
+    border-radius: 6px;
 }
 
 .positive-value {
-    background-color: #ddffdd !important; /* light green */
-    color: green;
-    font-weight: bold;
+    background-color: #d7f7ea !important; /* light tertiary */
+    color: #005236 !important;
+    font-weight: 700;
+    border-radius: 6px;
 }
 
-.ag-row-pinned {
-    background-color: rgba(137, 214, 197, 0.5) !important; /* Light blue or any color */
-    font-weight: bold;
+/* Pinned aggregate ("Total") row — neutral, matches "Total Programmed (USD)" summary style */
+.ag-theme-alpine .ag-row-pinned {
+    background-color: #e5e9eb !important; /* surface-container-highest */
+    border-top: 2px solid #006360 !important;
+    font-weight: 700;
+    color: #0b1c30;
 }
 
-.ag-center-cols-container .ag-row.ag-row-pinned.ag-row-top {
-    background-color: #e0ffe0 !important; /* Light green */
+.ag-theme-alpine .ag-center-cols-container .ag-row.ag-row-pinned.ag-row-top {
+    background-color: #e5e9eb !important;
 }
-
-

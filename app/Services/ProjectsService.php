@@ -26,7 +26,8 @@ class ProjectsService
             ->whereHas('budgetCyclePeriod', function ($query) {
                 $query->where('version', function ($sub) {
                     $sub->selectRaw('MAX(version)')
-                        ->from('budget_cycle_periods');
+                        ->from('budget_cycle_periods as bcp_latest')
+                        ->whereColumn('bcp_latest.start_year', 'budget_cycle_periods.start_year');
                 });
             })
             ->get();
@@ -303,7 +304,7 @@ class ProjectsService
                 $newBudgetPeriod->save();
 
                 // process projects in chunks
-                Projects::with(['budgets', 'cashCostYearLies.cashCostMonthly'])
+                Projects::with(['budgets', 'cashCostYearlies.cashCostMonthly'])
                     ->where('budget_cycle_period_id', $budgetPeriod->id)
                     ->chunk(20, function ($projects) use ($newBudgetPeriod) {
                         foreach ($projects as $project) {
@@ -320,8 +321,8 @@ class ProjectsService
                             }
 
                             // duplicate yearly + monthly
-                            if ($project->cashCostYearLies && $project->cashCostYearLies->count() > 0) {
-                                foreach ($project->cashCostYearLies as $yearly) {
+                            if ($project->cashCostYearlies && $project->cashCostYearlies->count() > 0) {
+                                foreach ($project->cashCostYearlies as $yearly) {
                                     $newYearly = $yearly->replicate();
                                     $newYearly->project_id = $newProject->id;
                                     $newYearly->save();
@@ -353,6 +354,18 @@ class ProjectsService
             throw $th;
         }
 
+    }
+
+    public function isLatestVersion(Projects $project): bool
+    {
+        $period = $project->budgetCyclePeriod;
+        if (!$period) {
+            return true;
+        }
+
+        $latestVersion = BudgetCyclePeriod::where('start_year', $period->start_year)->max('version');
+
+        return $period->version === $latestVersion;
     }
 
     public function getVersionListByYear($year){

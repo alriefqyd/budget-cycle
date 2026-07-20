@@ -1,10 +1,14 @@
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels'; // for module use
+import EmptyChartState from '@/Components/EmptyChartState.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
 
-export default function BarChartCostCash({dataChart, cols}) {
+export default function BarChartCostCash({dataChart, cols, year}) {
+    const hasData = [dataChart.cost, dataChart.cash]
+        .some(arr => (arr ?? []).some(value => Number(value) > 0));
+
     const roundUp = (value, multiple) => Math.ceil(value / multiple) * multiple;
     const data = {
         labels: dataChart.label,
@@ -109,18 +113,21 @@ export default function BarChartCostCash({dataChart, cols}) {
     };
 
     return (
-        <div className={`grid grid-cols-1 md:grid-cols-${cols} gap-6 mb-6`}>
-            <div className="md:col-span-6 bg-white rounded-xl p-6 shadow-lg">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h3 className="text-xl font-bold">Budget Chart</h3>
-                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                            <span className="text-green-500">▲</span> Budget Forecasting 2026–2030
-                        </p>
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+                <div>
+                    <h3 className="font-title-sm text-title-sm text-on-surface">Cost vs Cash</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="w-2 h-2 rounded-full bg-primary"></span>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">Cost and Cash (in million)</p>
                     </div>
                 </div>
-                <Bar options={options} data={data}/>
             </div>
+            {hasData ? (
+                <Bar options={options} data={data}/>
+            ) : (
+                <EmptyChartState year={year} />
+            )}
         </div>
     )
 }

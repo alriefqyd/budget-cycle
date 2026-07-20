@@ -11,11 +11,13 @@ import {
     Legend
 } from 'chart.js';
 import ChartDataLabels from "chartjs-plugin-datalabels";
+import EmptyChartState from '@/Components/EmptyChartState.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, ChartDataLabels);
 
-export default function PieChartCategory({ dataChart, cols }) {
+export default function PieChartCategory({ dataChart, cols, year }) {
     const [viewType, setViewType] = useState('count'); // "count" or "budget"
+    const hasData = (dataChart ?? []).length > 0;
 
     const defaultColors = [
         'rgb(255, 99, 132)',
@@ -94,25 +96,25 @@ export default function PieChartCategory({ dataChart, cols }) {
     };
 
     return (
-        <div className={`grid grid-cols-1 md:grid-cols-${cols} gap-6 mb-6`}>
-            <div className="md:col-span-6 bg-white rounded-xl p-6 shadow-lg">
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-title-sm text-title-sm text-on-surface">Project Category</h3>
+                <select
+                    value={viewType}
+                    onChange={(e) => setViewType(e.target.value)}
+                    className="bg-surface-container-low border-none rounded-lg text-xs font-label-caps focus:ring-1 focus:ring-primary"
+                >
+                    <option value="count">Total Projects</option>
+                    <option value="budget">Total Budget</option>
+                </select>
+            </div>
 
-                {/* Dropdown selector */}
-                <div className="mb-4">
-                    <label className="mr-2 font-semibold">View:</label>
-                    <select
-                        value={viewType}
-                        onChange={(e) => setViewType(e.target.value)}
-                        className="border rounded p-2 w-full md:w-1/5"
-                    >
-                        <option value="count">Total Projects 2026</option>
-                        <option value="budget">Total Budget 2026</option>
-                    </select>
-                </div>
-
-                <div style={{ height: '500px' }} className="flex justify-center items-center">
+            <div style={{ height: '500px' }} className="flex justify-center items-center">
+                {hasData ? (
                     <Pie data={data} options={options} />
-                </div>
+                ) : (
+                    <EmptyChartState year={year} />
+                )}
             </div>
         </div>
     );

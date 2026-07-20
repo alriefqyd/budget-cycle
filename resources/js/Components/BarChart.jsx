@@ -1,105 +1,88 @@
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import ChartDataLabels from 'chartjs-plugin-datalabels'; // for module use
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+import EmptyChartState from '@/Components/EmptyChartState.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
 
-export default function BarChart({dataChart, chartName, cols}) {
-    const roundUp = (value, multiple) => Math.ceil(value / multiple) * multiple;
-    const maxPlanAxisLeft = roundUp(Math.max(...dataChart.approved, ...dataChart.plan) + 20, 1);
-    const maxPlanAxisRight = roundUp(Math.max(...dataChart.approved5yp, ...dataChart.plan5yp) + 20, 1);
+const SERIES_PLAN = '#2a78d6';
+const SERIES_PRIOR = '#1baf7a';
+
+const formatMillions = (value) => {
+    if (value == null || isNaN(value)) return '-';
+    return Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+export default function BarChart({dataChart, chartName, cols, year}) {
+    // The backend appends a trailing '5YP' aggregate entry after the per-year values.
+    const yearlyLabels = (dataChart.label ?? []).slice(0, -1);
+    const yearlyPlan = (dataChart.plan ?? []).slice(0, -1);
+    const yearlyApproved = (dataChart.approved ?? []).slice(0, -1);
+    const totalPlan5yp = (dataChart.plan5yp ?? []).at(-1);
+    const totalApproved5yp = (dataChart.approved5yp ?? []).at(-1);
+
+    const hasData = [yearlyPlan, yearlyApproved].some(arr => arr.some(value => Number(value) > 0))
+        || Number(totalPlan5yp) > 0 || Number(totalApproved5yp) > 0;
+
+    const startYear = Number(year ?? dataChart.year ?? yearlyLabels[1] ?? new Date().getFullYear());
+    const endYear = startYear + 4;
+    const priorCycleStart = startYear - 1;
+    const priorCycleEnd = endYear - 1;
 
     const data = {
-        labels: dataChart.label,
+        labels: yearlyLabels,
         datasets: [
-            // Plan (2026–2030) - Left Axis
             {
-                label: 'Plan 2026-2030',
-                data: dataChart.plan,
-                borderColor: '#2CA6A4',
-                backgroundColor:  'rgb(214,61,92)',
-                yAxisID: 'approvedAxis',
-                barThickness: 52,
+                label: `Plan ${startYear}-${endYear}`,
+                data: yearlyPlan,
+                backgroundColor: SERIES_PLAN,
+                borderRadius: 4,
+                borderSkipped: false,
+                maxBarThickness: 40,
             },
-            // Approved (2026–2030) - Left Axis
             {
-                label: 'Budget cycle 2025-2029',
-                data: dataChart.approved,
-                borderColor: '#0D47A1',
-                backgroundColor: 'rgb(34,133,200)',
-                yAxisID: 'approvedAxis',
-                barThickness: 50,
-            },
-            // Plan (5YP) - Right Axis
-            {
-                label: 'Plan (5YP)',
-                skipLegend: true,
-                data: dataChart.plan5yp,
-                borderColor: '#2CA6A4',
-                backgroundColor:  'rgb(214,61,92)',
-                yAxisID: 'planAxis',
-                barThickness: 50,
-
-            },
-            // Approved (5YP) - Right Axis
-            {
-                label: 'Approved (5YP)',
-                skipLegend: true,
-                data: dataChart.approved5yp,
-                borderColor: '#0D47A1',
-                backgroundColor: 'rgb(34,133,200)',
-                yAxisID: 'planAxis',
-                barThickness: 52,
+                label: `Prior Cycle ${priorCycleStart}-${priorCycleEnd}`,
+                data: yearlyApproved,
+                backgroundColor: SERIES_PRIOR,
+                borderRadius: 4,
+                borderSkipped: false,
+                maxBarThickness: 40,
             },
         ]
     };
 
-    console.log(chartName)
+    const roundUp = (value, multiple) => Math.ceil(value / multiple) * multiple;
+    const maxAxis = roundUp(Math.max(0, ...yearlyPlan, ...yearlyApproved) * 1.2, 10);
 
     const options = {
         responsive: true,
         plugins: {
-            title: {
-                display: true,
-                text: '5YP 2026–2030 Sustaining Investment Highlights (Cash in million)',
-                font: {
-                    size: 16,
-                },
-            },
+            title: { display: false },
             tooltip: {
                 mode: 'index',
                 intersect: false,
+                callbacks: {
+                    label: (context) => `${context.dataset.label}: ${formatMillions(context.raw)} M`,
+                },
             },
             legend: {
                 position: 'top',
+                align: 'start',
                 labels: {
-                    generateLabels: function (chart) {
-                        return chart.data.datasets
-                            .filter(ds => !ds.skipLegend)
-                            .map((dataset, i) => {
-                                return {
-                                    text: dataset.label,
-                                    fillStyle: dataset.backgroundColor,
-                                    hidden: !chart.isDatasetVisible(i),
-                                    datasetIndex: i
-                                }
-                            });
-                    }
+                    boxWidth: 10,
+                    boxHeight: 10,
+                    usePointStyle: true,
+                    pointStyle: 'rectRounded',
+                    font: { size: 12, weight: '600' },
                 }
             },
             datalabels: {
                 anchor: 'end',
-                align: 'start',
-                offset: -20,
-                color: 'black',
-                font: {
-                    weight: 'bold',
-                    size: 12,
-
-                },
-                formatter: function (value) {
-                    return value?.toLocaleString(); // Adds commas
-                },
+                align: 'end',
+                offset: 2,
+                color: '#52514e',
+                font: { weight: '600', size: 11 },
+                formatter: (value) => value > 0 ? formatMillions(value) : '',
             },
         },
         interaction: {
@@ -109,67 +92,59 @@ export default function BarChart({dataChart, chartName, cols}) {
         },
         scales: {
             x: {
-                grid:{
-                    display: false
-                },
-                title: {
-                    display: true,
-                    text: 'Year',
-                },
-                categoryPercentage: 0.8,
-                barPercentage: 0.9
+                grid: { display: false },
+                border: { display: false },
+                ticks: { font: { size: 12, weight: '600' } },
             },
-            approvedAxis: {
-                type: 'linear',
-                position: 'left',
+            y: {
                 beginAtZero: true,
-                max: maxPlanAxisLeft,
-                title: {
-                    display: true,
-                    text: 'Investment',
-                },
-                ticks: {
-                    display: false
-                },
-                grid:{
-                    display: false
-                }
-
-            },
-            planAxis: {
-                type: 'linear',
-                position: 'right',
-                beginAtZero: true,
-                max: maxPlanAxisRight,
-                title: {
-                    display: true,
-                    text: '5YP Total',
-                },
-                ticks: {
-                    display: false
-                },
-                grid: {
-                    display: false,
-                },
+                max: maxAxis || undefined,
+                border: { display: false },
+                grid: { color: '#e1e0d9' },
+                ticks: { display: false },
             },
         },
-
     };
 
     return (
-        <div className={`grid grid-cols-1 md:grid-cols-${cols} gap-6 mb-6`}>
-            <div className="md:col-span-6 bg-white rounded-xl p-6 shadow-lg">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h3 className="text-xl font-bold">Budget Chart</h3>
-                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                            <span className="text-green-500">▲</span> Budget Forecasting 2026–2030
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-stack-md mb-stack-md">
+                <div>
+                    <h3 className="font-title-sm text-title-sm text-on-surface">Sustaining Investment Highlights</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="w-2 h-2 rounded-full bg-tertiary"></span>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">
+                            5YP {startYear}–{endYear} · Cash in million
                         </p>
                     </div>
                 </div>
-                <Bar options={options} data={data}/>
+
+                {hasData && (
+                    <div className="flex items-center gap-3">
+                        <div className="px-4 py-2 rounded-lg bg-surface-container-low border border-outline-variant min-w-[140px]">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant" style={{color: SERIES_PLAN}}>
+                                5YP Plan Total
+                            </p>
+                            <p className="font-data-tabular text-lg font-bold text-on-surface tabular-nums">
+                                {formatMillions(totalPlan5yp)} M
+                            </p>
+                        </div>
+                        <div className="px-4 py-2 rounded-lg bg-surface-container-low border border-outline-variant min-w-[140px]">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant" style={{color: SERIES_PRIOR}}>
+                                Prior Cycle Total
+                            </p>
+                            <p className="font-data-tabular text-lg font-bold text-on-surface tabular-nums">
+                                {formatMillions(totalApproved5yp)} M
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
+            {hasData ? (
+                <Bar options={options} data={data}/>
+            ) : (
+                <EmptyChartState year={year} />
+            )}
         </div>
     )
 }
-
