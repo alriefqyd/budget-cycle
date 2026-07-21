@@ -57,8 +57,9 @@ class ProjectsController extends Controller
 
             DB::commit();
             /** Websocket */
-            $projectService->updateChart($request->year_period);
-            $projectService->updateBudgets($request->year_period, $data->id);
+            $year = $request->year_period ?? $data->year_period;
+            $projectService->updateChart($year);
+            $projectService->updateBudgets($year, $data->id);
             return response()->json([
                 'success' => true,
                 'message' => 'Budget create successfully',
@@ -269,9 +270,10 @@ class ProjectsController extends Controller
             }
 
             DB::commit();
-            $projectService->updateChart($request->year_period);
-            $projectService->updateBudgets($request->year_period, $id);
-            $projectService->updateBudgetList($request->year_period);
+            $year = $request->year_period ?? $project->year_period;
+            $projectService->updateChart($year);
+            $projectService->updateBudgets($year, $id);
+            $projectService->updateBudgetList($year);
             return response()->json([
                 'success' => true,
                 'message' => 'Budget updated successfully',

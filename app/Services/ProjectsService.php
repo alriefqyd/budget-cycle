@@ -284,7 +284,11 @@ class ProjectsService
     }
 
     public function updateBudgets($year, $id){
-        broadcast(new BudgetUpdated($this->getBudgetsByYear($year, $id)));
+        $budgets = $this->getBudgetsByYear($year, $id);
+        if (is_null($budgets)) {
+            return;
+        }
+        broadcast(new BudgetUpdated($budgets));
     }
 
     public function updateBudgetList($year){
