@@ -193,7 +193,7 @@ class ProjectsController extends Controller
             DB::beginTransaction();
             $project = Projects::with(['budgets','cashCostYearlies','budgetCyclePeriod'])->findOrFail($id);
             $projectService = new ProjectsService();
-            if (!$projectService->isLatestVersion($project)) {
+            if ($projectService->isLocked($project)) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
@@ -299,7 +299,7 @@ class ProjectsController extends Controller
 
         $projects = Projects::with(['budgets', 'cashCostYearlies', 'budgetCyclePeriod'])->whereIn('id', $ids)->get();
 
-        $lockedIds = $projects->reject(fn ($project) => $projectService->isLatestVersion($project))->pluck('id')->values();
+        $lockedIds = $projects->filter(fn ($project) => $projectService->isLocked($project))->pluck('id')->values();
         if ($lockedIds->isNotEmpty()) {
             return response()->json([
                 'message' => 'Cannot delete projects belonging to a locked (non-latest) budget cycle version.',
@@ -324,6 +324,15 @@ class ProjectsController extends Controller
                 $version = 0;
             }
             $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
+
+            $latestVersion = BudgetCyclePeriod::where('start_year', $year)->max('version');
+            if ((int) $budgetPeriod->version !== (int) $latestVersion) {
+                return response()->json(['message' => 'Only the latest budget cycle version can be finalized.'], 423);
+            }
+            if ($budgetPeriod->approval_status === ApprovalStatus::FINAL->value) {
+                return response()->json(['message' => 'This budget cycle version is locked and can no longer be finalized.'], 423);
+            }
+
             $budgetPeriod->approval_status = ApprovalStatus::SUBMISSION;
 
             $budgetPeriod->save();
@@ -336,19 +345,44 @@ class ProjectsController extends Controller
         }
     }
 
+    public function lock($year, $version){
+        try {
+            $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
+
+            $latestVersion = BudgetCyclePeriod::where('start_year', $year)->max('version');
+            if ((int) $budgetPeriod->version !== (int) $latestVersion) {
+                return response()->json(['message' => 'Only the latest budget cycle version can be locked.'], 423);
+            }
+            if ($budgetPeriod->approval_status === ApprovalStatus::FINAL->value) {
+                return response()->json(['message' => 'This budget cycle version is already locked.'], 423);
+            }
+
+            $budgetPeriod->approval_status = ApprovalStatus::FINAL;
+            $budgetPeriod->save();
+
+            $projectService = new ProjectsService();
+            $projectService->updateBudgetList($year);
+            return response()->json(['message' => 'Budget cycle locked and approved.', 'status' => 200]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
     public function getBudgetByYearAndVersion($year, $version){
         try {
             $projectService = new ProjectsService;
             $budgets = $projectService->getBudgetsByYear($year, null, $version);
             $versions =  BudgetCyclePeriod::where('start_year',$year)->get();
             $latestVersion = $versions->max('version');
+            $currentPeriod = $versions->firstWhere('version', (int) $version);
 
             return response()->json([
                 'status' => 200,
                 'year' => $year,
                 'version' => $version,
                 'budgets' => $budgets,
-                'latestVersion' => $latestVersion
+                'latestVersion' => $latestVersion,
+                'approvalStatus' => $currentPeriod->approval_status ?? null,
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);

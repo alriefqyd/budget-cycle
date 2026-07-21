@@ -69,6 +69,7 @@ export default function Show() {
     const [budgetTotalYear, setBudgetTotalYear] = useState(0);
     const [loadingFinalize, setLoadingFinalize] = useState(false)
     const [isLatestVersion, setIsLatestVersion] = useState(true);
+    const [isFinal, setIsFinal] = useState(budgetVersion.approval_status === 'final');
     const [showFilters, setShowFilters] = useState(false);
 
     useEffect(() => {
@@ -549,6 +550,7 @@ export default function Show() {
             setRowData(response.data.budgets);
             setLoading(false)
             setIsLatestVersion(e.target.value == response.data.latestVersion);
+            setIsFinal(response.data.approvalStatus === 'final');
         } else {
             Swal.fire('Error', response.message, 'warning');
             setLoading(false)
@@ -1138,6 +1140,7 @@ export default function Show() {
                 setVersionBudgetPeriod(prev => prev + 1);
                 const budgetByVersion = await getBudgetByVersion(versionBudgetPeriod + 1)
                 setRowData(budgetByVersion.data.budgets)
+                setIsFinal(false);
                 Swal.fire({
                     icon: 'success',
                     title: 'Successfully Finalized',
@@ -1159,9 +1162,52 @@ export default function Show() {
 
         } catch (e) {
             console.error('Error finalize:', e);
-            Swal.fire('Error', 'An unexpected error occurred.', 'error');
+            Swal.fire('Error', e.response?.data?.message || 'An unexpected error occurred.', 'error');
+            setLoadingFinalize(false)
         }
 
+    }
+
+    const handleLock = async () => {
+        const result = await Swal.fire({
+            title: 'Lock & Approve this version?',
+            text: 'This permanently locks this budget cycle version as Final and Approved. It can never be edited or unlocked again.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, Lock & Approve!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+        setLoadingFinalize(true)
+        try {
+            const response = await axios({
+                method: 'put',
+                url: `/budgets-lock/${startYear}/${versionBudgetPeriod}`,
+                data: {},
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (response.status === 200) {
+                setIsFinal(true);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Locked & Approved',
+                    text: response.data.message,
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+            }
+        } catch (e) {
+            console.error('Error locking:', e);
+            Swal.fire('Error', e.response?.data?.message || 'An unexpected error occurred.', 'error');
+        } finally {
+            setLoadingFinalize(false)
+        }
     }
 
     const fetchVersionList = async () => {
@@ -1300,13 +1346,31 @@ export default function Show() {
                                 </select>
                             </div>
 
-                            <button
-                                onClick={handleFinalize}
-                                className="inline-flex items-center gap-2 px-stack-md py-2 bg-tertiary-container text-on-tertiary-container rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-95"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">task_alt</span>
-                                Finalize Budget Cycle
-                            </button>
+                            {isFinal ? (
+                                <span className="inline-flex items-center gap-2 px-stack-md py-2 bg-secondary-container text-on-secondary-container rounded-lg font-label-caps text-label-caps">
+                                    <span className="material-symbols-outlined text-[18px]">lock</span>
+                                    Final &amp; Approved
+                                </span>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleFinalize}
+                                        disabled={!isLatestVersion}
+                                        className="inline-flex items-center gap-2 px-stack-md py-2 bg-tertiary-container text-on-tertiary-container rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">task_alt</span>
+                                        Finalize Budget Cycle
+                                    </button>
+                                    <button
+                                        onClick={handleLock}
+                                        disabled={!isLatestVersion}
+                                        className="inline-flex items-center gap-2 px-stack-md py-2 bg-error/10 text-error border border-error/20 rounded-lg font-label-caps text-label-caps hover:bg-error/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">lock</span>
+                                        Lock &amp; Approve
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -1324,9 +1388,9 @@ export default function Show() {
                                 columnDefs={columnDefs}
                                 defaultColDef={{
                                     ...defaultColDef,
-                                    editable: isLatestVersion,   // <--- globally disable editing
+                                    editable: isLatestVersion && !isFinal,   // <--- globally disable editing
                                 }}
-                                suppressClickEdit={!isLatestVersion}  // <--- prevent entering edit mode
+                                suppressClickEdit={!(isLatestVersion && !isFinal)}  // <--- prevent entering edit mode
                                 // pagination={true}
                                 // paginationPageSize={20}
                                 onCellValueChanged={onCellValueChanged}
@@ -1343,7 +1407,7 @@ export default function Show() {
                 </div>
             </div>
 
-            {isLatestVersion && (
+            {isLatestVersion && !isFinal && (
                 <button
                     onClick={handleAddNewRow}
                     title="Add new budget row"

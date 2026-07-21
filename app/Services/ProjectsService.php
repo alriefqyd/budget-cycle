@@ -360,16 +360,20 @@ class ProjectsService
 
     }
 
-    public function isLatestVersion(Projects $project): bool
+    public function isLocked(Projects $project): bool
     {
         $period = $project->budgetCyclePeriod;
         if (!$period) {
+            return false;
+        }
+
+        if ($period->approval_status === ApprovalStatus::FINAL->value) {
             return true;
         }
 
         $latestVersion = BudgetCyclePeriod::where('start_year', $period->start_year)->max('version');
 
-        return $period->version === $latestVersion;
+        return $period->version !== $latestVersion;
     }
 
     public function getVersionListByYear($year){
