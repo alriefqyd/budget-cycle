@@ -2,11 +2,13 @@ FROM php:8.2-fpm
 
 # Install required packages and extensions
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     libzip-dev \
     zip \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev && \
+    update-ca-certificates && \
     docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install pdo_mysql zip gd
 

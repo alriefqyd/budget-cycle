@@ -279,7 +279,7 @@ class ProjectsService
         $dataCostCash = $homeController->getData5yp($year);
         $dataCategory = $homeController->getProjectByType($year);
         $dataOwner = $homeController->getProjectByDirectorate($year);
-        broadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash, $dataCategory, $dataOwner));
+        $this->safeBroadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash, $dataCategory, $dataOwner));
     }
 
     public function updateBudgets($year, $id){
@@ -287,13 +287,25 @@ class ProjectsService
         if (is_null($budgets)) {
             return;
         }
-        broadcast(new BudgetUpdated($budgets));
+        $this->safeBroadcast(new BudgetUpdated($budgets));
     }
 
     public function updateBudgetList($year){
         $projectService = new ProjectsService();
         $data = $projectService->getDataProjectIndex();
-        broadcast(new BudgetListUpdated($data->toArray()));
+        $this->safeBroadcast(new BudgetListUpdated($data->toArray()));
+    }
+
+    // Broadcasting is a real-time UI nicety, not core business logic — the
+    // database work that triggered it has already been committed by the time
+    // this runs, so a Pusher/network failure here must not be reported to the
+    // caller as if the underlying action (import, save, finalize...) failed.
+    private function safeBroadcast($event){
+        try {
+            broadcast($event);
+        } catch (\Throwable $e) {
+            Log::error('Broadcast failed: ' . $e->getMessage());
+        }
     }
 
     public function duplicateDataFinalize($budgetPeriodId){
