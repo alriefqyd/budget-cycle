@@ -17,6 +17,9 @@ class HomeController extends Controller
         $pieChart = $this->getProjectByType($year);
         $floatingChart = $this->getProjectByDirectorate($year);
 
+        $versions = BudgetCyclePeriod::where('start_year', $year)->get();
+        $defaultVersion = $versions->max('version');
+
         return Inertia::render('Dashboard',
         [
             'dataChart' => $dataChart,
