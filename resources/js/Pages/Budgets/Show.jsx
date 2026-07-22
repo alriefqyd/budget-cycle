@@ -71,6 +71,7 @@ export default function Show() {
     const [isLatestVersion, setIsLatestVersion] = useState(true);
     const [isFinal, setIsFinal] = useState(budgetVersion.approval_status === 'final');
     const [showFilters, setShowFilters] = useState(false);
+    const [deletingData, setDeletingData] = useState(false);
 
     useEffect(() => {
         fetchVersionList();
@@ -462,10 +463,24 @@ export default function Show() {
     };
 
     const handleImport = async (data) => {
+        const result = await Swal.fire({
+            title: 'Replace data in this version?',
+            text: 'Any project in this version whose SAP Code is not in the uploaded file will be permanently deleted. This cannot be undone!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, import and replace',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
         setLoading(true)
         const formData = new FormData();
         formData.append("file", data.file)
         formData.append("year", data.year)
+        formData.append("version", versionBudgetPeriod)
 
         try {
             const response = await axios.post('/budgets/import-project', formData, {
@@ -473,6 +488,9 @@ export default function Show() {
                     'Content-Type': 'multipart/form-data'
                 }
             })
+
+            const budgetByVersion = await getBudgetByVersion(versionBudgetPeriod);
+            setRowData(budgetByVersion.data.budgets);
 
             Swal.fire({
                 icon: 'success',
@@ -1083,6 +1101,7 @@ export default function Show() {
         const ids = selectedRows.map(row => row.id);
         const query = ids.map(id => `ids[]=${id}`).join('&');
 
+        setDeletingData(true);
         try {
             const response = await axios.delete(`/budgets?${query}&year=${startYear}`, {
                 headers: {
@@ -1090,23 +1109,28 @@ export default function Show() {
                 }
             });
 
-            console.log(response);
-
-            // axios puts parsed data in response.data
-            if (response.status !== 200) {
-                console.error('Delete failed:', response.data);
-                alert('Failed to delete budget.');
-                return;
-            }
-
             setRowData(prevData =>
                 prevData.filter(row => !ids.includes(row.id))
             );
 
             setSelectedRowsState([]);
+            Swal.fire({
+                icon: 'success',
+                title: 'Deleted',
+                text: response.data?.message || 'Selected budgets deleted.',
+                timer: 2000,
+                showConfirmButton: false,
+            });
         } catch (error) {
             console.error('Error deleting:', error);
-            Swal.fire('Error', 'An unexpected error occurred.', 'error');
+            const message = error.response?.data?.message || 'An unexpected error occurred while deleting.';
+            const lockedIds = error.response?.data?.locked_ids || [];
+            const lockedSapCodes = selectedRows
+                .filter(row => lockedIds.includes(row.id))
+                .map(row => row.sap_code || row.id);
+            Swal.fire('Delete failed', lockedSapCodes.length ? `${message} (SAP Code: ${lockedSapCodes.join(', ')})` : message, 'error');
+        } finally {
+            setDeletingData(false);
         }
     }
 
@@ -1210,6 +1234,56 @@ export default function Show() {
         }
     }
 
+    const handleDeleteVersion = async () => {
+        if (versionList.length <= 1) {
+            Swal.fire('Cannot delete', 'This is the only version for this budget cycle.', 'warning');
+            return;
+        }
+
+        const result = await Swal.fire({
+            title: `Delete version ${versionBudgetPeriod}?`,
+            text: 'This permanently deletes ALL projects, budgets, and cash/cost data belonging to this version. This cannot be undone!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete this version!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
+        setLoading(true);
+        try {
+            const response = await axios.delete(`/budgets-version/${startYear}/${versionBudgetPeriod}`, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (response.status === 200) {
+                await fetchVersionList();
+                const nextVersion = response.data.latestVersion;
+                setVersionBudgetPeriod(nextVersion);
+                const budgetByVersion = await getBudgetByVersion(nextVersion);
+                setRowData(budgetByVersion.data.budgets);
+                setIsLatestVersion(true);
+                setIsFinal(budgetByVersion.data.approvalStatus === 'final');
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Version deleted',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+            }
+        } catch (e) {
+            console.error('Error deleting version:', e);
+            Swal.fire('Error', e.response?.data?.message || 'An unexpected error occurred.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const fetchVersionList = async () => {
         try {
             const response = await axios.get(`/budgets-versions/${startYear}`);
@@ -1282,10 +1356,20 @@ export default function Show() {
                         <div className="h-6 w-px bg-outline-variant mx-1"></div>
                         <button
                             onClick={handleDelete}
-                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-error/10 text-error border border-error/20 rounded-lg font-label-caps text-label-caps hover:bg-error/20 transition-all active:scale-95"
+                            disabled={deletingData}
+                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-error/10 text-error border border-error/20 rounded-lg font-label-caps text-label-caps hover:bg-error/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                            Delete Data
+                            {deletingData ? (
+                                <>
+                                    <Spinner color="text-error"/>
+                                    <span>Deleting...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                    Delete Data
+                                </>
+                            )}
                         </button>
                         <button
                             onClick={handleDuplicateRow}
@@ -1344,6 +1428,14 @@ export default function Show() {
                                         </option>
                                     ))}
                                 </select>
+                                <button
+                                    onClick={handleDeleteVersion}
+                                    disabled={versionList.length <= 1}
+                                    title="Delete this version and all its data"
+                                    className="inline-flex items-center justify-center w-8 h-8 bg-error/10 text-error border border-error/20 rounded-lg hover:bg-error/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                                </button>
                             </div>
 
                             {isFinal ? (

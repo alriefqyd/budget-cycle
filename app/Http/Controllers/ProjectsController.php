@@ -147,23 +147,57 @@ class ProjectsController extends Controller
     public function uploadProject(Request $request){
         $file = $request->file('file');
 
-        if ($request->hasFile('file')) {
-            Log::info('Starting import projects...');
-            try {
-                $projectService = new ProjectsService;
-                $importClass = new ProjectsImport($request->year, true, null);
-                Excel::import($importClass, $file);
-                Log::info('Import project successful');
-                return response()->json(['message' => 'Import Successful']);
-            } catch (\Exception $e) {
-                DB::rollback();
-                Log::error('Import error: ' . $e->getMessage());
-                return response()->json(['message' => $e->getMessage()], 500);
-            }
+        if (!$request->hasFile('file')) {
+            Log::info('No file uploaded');
+            return response()->json(['message' => 'No file uploaded'], 400);
         }
 
-        Log::info('No file uploaded');
-        return response()->json(['message' => 'No file uploaded'], 400);
+        Log::info('Starting import projects...');
+        try {
+            $budgetPeriod = BudgetCyclePeriod::where('start_year', $request->year)
+                ->where('version', $request->version)
+                ->firstOrFail();
+
+            $latestVersion = BudgetCyclePeriod::where('start_year', $request->year)->max('version');
+            if ((int) $budgetPeriod->version !== (int) $latestVersion) {
+                return response()->json(['message' => 'Cannot import into a locked (non-latest) budget cycle version.'], 423);
+            }
+            if ($budgetPeriod->approval_status === ApprovalStatus::FINAL->value) {
+                return response()->json(['message' => 'This budget cycle version is locked and can no longer be imported into.'], 423);
+            }
+
+            $projectService = new ProjectsService;
+            $importClass = new ProjectsImport($request->year, true, $budgetPeriod->id);
+            Excel::import($importClass, $file);
+
+            $importedSapCodes = $importClass->getImportedSapCodes();
+            if (empty($importedSapCodes)) {
+                return response()->json(['message' => 'No valid rows found in file. Aborted to avoid deleting all projects in this version.'], 422);
+            }
+
+            $staleProjects = Projects::where('budget_cycle_period_id', $budgetPeriod->id)
+                ->whereNotIn('sap_code', $importedSapCodes)
+                ->get();
+
+            foreach ($staleProjects as $project) {
+                $project->cashCostYearlies()->delete();
+                $project->budgets()->delete();
+                $project->delete();
+            }
+            $deletedCount = $staleProjects->count();
+
+            $projectService->updateBudgetList($request->year);
+            $projectService->updateChart($request->year);
+
+            Log::info('Import project successful');
+            return response()->json([
+                'message' => "Import successful. {$deletedCount} project(s) not in the file were deleted from this version.",
+            ]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('Import error: ' . $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 
     public function create(Request $request){
@@ -397,6 +431,43 @@ class ProjectsController extends Controller
                 'status' => 200,
                 'year' => $year,
                 'data' => $versions,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
+    public function deleteVersion($year, $version){
+        try {
+            $budgetPeriod = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
+
+            $totalVersions = BudgetCyclePeriod::where('start_year', $year)->count();
+            if ($totalVersions <= 1) {
+                return response()->json(['message' => 'Cannot delete the only version of this budget cycle.'], 423);
+            }
+
+            DB::transaction(function () use ($budgetPeriod) {
+                $projects = $budgetPeriod->projects()->with(['cashCostYearlies.cashCostMonthly'])->get();
+                foreach ($projects as $project) {
+                    foreach ($project->cashCostYearlies as $yearly) {
+                        $yearly->cashCostMonthly()->delete();
+                    }
+                    $project->cashCostYearlies()->delete();
+                    $project->budgets()->delete();
+                    $project->delete();
+                }
+                $budgetPeriod->delete();
+            });
+
+            $projectService = new ProjectsService();
+            $projectService->updateBudgetList($year);
+
+            $remainingVersions = BudgetCyclePeriod::where('start_year', $year)->orderBy('version', 'desc')->get();
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Budget cycle version deleted.',
+                'latestVersion' => $remainingVersions->max('version'),
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);

@@ -3,7 +3,6 @@
 namespace App\Imports;
 
 use App\Events\BudgetListUpdated;
-use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostYearly;
 use App\Models\project;
@@ -54,6 +53,10 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
 
     public function uniqueBy(){
         return 'SAP Code';
+    }
+
+    public function getImportedSapCodes(): array{
+        return array_values(array_unique(array_filter($this->uniqueIdentifiers, fn ($code) => $code !== null)));
     }
 
     public function map($row): array{
@@ -121,8 +124,11 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         $this->uniqueIdentifiers[] = $row['sap_code'];
         if ($row['sap_code'] !== null && preg_match('/^C[1-9]/', $row['sap_code'])) {
             if ($this->isBudgetCycle) {
-                // Check if existing project
-                $project = Projects::firstOrNew(['sap_code' => $row['sap_code']]);
+                // Check if existing project within this budget cycle version
+                $project = Projects::firstOrNew([
+                    'sap_code' => $row['sap_code'],
+                    'budget_cycle_period_id' => $this->budgetCyclePeriodId,
+                ]);
 
                 // Fill other updatable fields
                 $project->fill([
@@ -140,12 +146,6 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                     'fm_new' => $row['fm_new'],
                     'year_period' => $row['year_period'],
                 ]);
-
-                // Only set budget_cycle_period_id when creating
-                if (!$project->exists) {
-                    $budgetId = BudgetCyclePeriod::where('start_year', $this->year)->first();
-                    $project->budget_cycle_period_id = $budgetId->id;
-                }
                 $project->save();
             } else {
                 $project = Projects::create([
@@ -242,21 +242,5 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         $projectService = new ProjectsService();
         $data = $projectService->getDataProjectIndex();
         broadcast(new BudgetListUpdated($data->toArray()));
-        //  $importInstance = $event->getConcernable();
-        //  Projects::whereNotIn('sap_code', $importInstance->uniqueIdentifiers)->delete();
     }
-
-//    public function registerEvents(): array
-//    {
-//        return [
-//            AfterImport::class => function (AfterImport $event) {
-//                Log::info('AfterImport event fired');
-//
-//                // Only delete old projects if budget cycle is active
-//                if ($this->isBudgetCycle) {
-//                    Projects::whereNotIn('sap_code', $this->uniqueIdentifiers)->delete();
-//                }
-//            },
-//        ];
-//    }
 }
