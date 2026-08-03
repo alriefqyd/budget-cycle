@@ -15,7 +15,6 @@ use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
 use App\Services\ProjectsService;
-use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +25,16 @@ use Mockery\Exception;
 
 class ProjectsController extends Controller
 {
+    // Debugbar is require-dev only — not installed in production — so this
+    // must never reference the class/facade directly (that's a fatal "class
+    // not found" in prod). Checking the container binding is safe either way.
+    private function disableDebugbarIfPresent(): void
+    {
+        if (app()->bound('debugbar')) {
+            app('debugbar')->disable();
+        }
+    }
+
     public function index(){
         $projectService = new ProjectsService();
         $projects = $projectService->getDataProjectIndex();
@@ -134,7 +143,7 @@ class ProjectsController extends Controller
         // query's SQL/bindings/backtrace for the whole request — for a few
         // hundred rows that alone exhausts the default 128M memory_limit
         // well before the import logic itself does anything heavy.
-        Debugbar::disable();
+        $this->disableDebugbarIfPresent();
         ini_set('memory_limit', '512M');
 
         $projectService = new ProjectsService();
@@ -174,7 +183,7 @@ class ProjectsController extends Controller
     public function uploadProject(Request $request){
         // See upload() above — same per-row query volume, same Debugbar
         // memory blow-up risk.
-        Debugbar::disable();
+        $this->disableDebugbarIfPresent();
         ini_set('memory_limit', '512M');
 
         $file = $request->file('file');
