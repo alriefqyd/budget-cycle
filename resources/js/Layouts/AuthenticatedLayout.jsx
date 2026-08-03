@@ -30,7 +30,7 @@ export default function AuthenticatedLayout({ header, children }) {
     const { auth } = usePage().props;
     const user = auth.user;
     const currentPath = usePage().url;
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(true);
 
     return (
         <div className="min-h-screen bg-background text-on-surface font-sans">
@@ -52,7 +52,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 </button>
 
                 <div className={`px-6 mb-8 flex items-center ${collapsed ? 'justify-center px-0' : 'gap-3'}`}>
-                    <ApplicationLogo className="h-10 w-auto shrink-0 fill-current text-primary" />
+                    <ApplicationLogo iconOnly={collapsed} className="h-10 w-auto shrink-0 fill-current text-primary" />
                     {!collapsed && (
                         <p className="font-label-caps text-label-caps text-on-surface-variant opacity-70">Budget System</p>
                     )}

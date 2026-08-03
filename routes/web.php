@@ -18,6 +18,9 @@ Route::get('/dashboard', [\App\Http\Controllers\HomeController::class, 'index'])
 Route::get('/getDashboardByVersion', [\App\Http\Controllers\HomeController::class, 'getDashboardByVersion'])->middleware(['auth', 'verified']);
 Route::get('/budgets', [\App\Http\Controllers\ProjectsController::class, 'index'])->middleware(['auth'])->name('budget-list');
 Route::get('/budgets/{year}', [\App\Http\Controllers\ProjectsController::class, 'show'])->middleware(['auth'])->name('budget-show');
+Route::get('/budgets/{year}/compare', [\App\Http\Controllers\ProjectsController::class, 'compare'])->middleware(['auth'])->name('budget-compare');
+Route::get('/budgets/{year}/my-forecast', [\App\Http\Controllers\ProjectsController::class, 'myForecast'])->middleware(['auth'])->name('budget-my-forecast');
+Route::get('/budgets-compare/{year}', [\App\Http\Controllers\ProjectsController::class, 'compareData'])->middleware(['auth'])->name('budget-compare-data');
 Route::post('/budgets/upload', [\App\Http\Controllers\ProjectsController::class, 'upload'])->middleware(['auth'])->name('budget-upload');
 Route::post('/export/budgets', [\App\Http\Controllers\ProjectsController::class, 'export'])->middleware(['auth'])->name('budget-detail-upload');
 Route::post('/budgets/import-project', [\App\Http\Controllers\ProjectsController::class, 'uploadProject'])->middleware(['auth'])->name('budget-upload-detail');

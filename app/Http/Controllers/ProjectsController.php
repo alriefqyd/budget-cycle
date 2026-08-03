@@ -15,6 +15,7 @@ use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
 use App\Models\Projects;
 use App\Services\ProjectsService;
+use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -40,6 +41,24 @@ class ProjectsController extends Controller
         $versions = $projectService->getVersionListByYear($year);
         $budgetVersion = BudgetCyclePeriod::where('start_year', $year)->orderBy('version', 'desc')->first();
         return Inertia::render('Budgets/Show', [
+            'year' => $year,
+            'budgets' => $budgets,
+            'versions' => $versions,
+            'budgetVersion' => $budgetVersion
+        ]);
+    }
+
+    // Simplified, PM-filterable forecast view. Reuses the same data source as
+    // show() (getBudgetsByYear) so it always reflects the latest version —
+    // this is intentionally a thinner *view* over the same data, not a
+    // separate data path, so it can never drift out of sync with the main grid.
+    public function myForecast($year)
+    {
+        $projectService = new ProjectsService;
+        $budgets = $projectService->getBudgetsByYear($year, null);
+        $versions = $projectService->getVersionListByYear($year);
+        $budgetVersion = BudgetCyclePeriod::where('start_year', $year)->orderBy('version', 'desc')->first();
+        return Inertia::render('Budgets/MyForecast', [
             'year' => $year,
             'budgets' => $budgets,
             'versions' => $versions,
@@ -110,6 +129,14 @@ class ProjectsController extends Controller
     }
 
     public function upload(Request $request){
+        // A bulk import runs ~10 queries per row (project + cash/cost yearly
+        // rows + budget setting), and in local/dev Debugbar retains every
+        // query's SQL/bindings/backtrace for the whole request — for a few
+        // hundred rows that alone exhausts the default 128M memory_limit
+        // well before the import logic itself does anything heavy.
+        Debugbar::disable();
+        ini_set('memory_limit', '512M');
+
         $projectService = new ProjectsService();
         $data = $projectService->getDataProjectIndex();
         $file = $request->file('file');
@@ -145,6 +172,11 @@ class ProjectsController extends Controller
     }
 
     public function uploadProject(Request $request){
+        // See upload() above — same per-row query volume, same Debugbar
+        // memory blow-up risk.
+        Debugbar::disable();
+        ini_set('memory_limit', '512M');
+
         $file = $request->file('file');
 
         if (!$request->hasFile('file')) {
@@ -417,6 +449,38 @@ class ProjectsController extends Controller
                 'budgets' => $budgets,
                 'latestVersion' => $latestVersion,
                 'approvalStatus' => $currentPeriod->approval_status ?? null,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
+    public function compare(Request $request, $year){
+        $projectService = new ProjectsService;
+        $versions = $projectService->getVersionListByYear($year)->values();
+        $latest = $versions->first();
+        $previous = $versions->count() > 1 ? $versions->get(1) : $latest;
+
+        $versionA = $request->query('version_a', $previous);
+        $versionB = $request->query('version_b', $latest);
+
+        $comparison = $projectService->compareVersions($year, $versionA, $versionB);
+
+        return Inertia::render('Budgets/Compare', [
+            'year' => $year,
+            'versions' => $versions,
+            'comparison' => $comparison,
+        ]);
+    }
+
+    public function compareData(Request $request, $year){
+        try {
+            $projectService = new ProjectsService;
+            $comparison = $projectService->compareVersions($year, $request->query('version_a'), $request->query('version_b'));
+
+            return response()->json([
+                'status' => 200,
+                'comparison' => $comparison,
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);

@@ -16,6 +16,7 @@ class HomeController extends Controller
         $dataChart5Yp = $this->getData5yp($year);
         $pieChart = $this->getProjectByType($year);
         $floatingChart = $this->getProjectByDirectorate($year);
+        $directorateTrend = $this->getDirectorateTrend($year);
 
         $versions = BudgetCyclePeriod::where('start_year', $year)->get();
         $defaultVersion = $versions->max('version');
@@ -26,6 +27,7 @@ class HomeController extends Controller
             'dataCostCash5yp' => $dataChart5Yp,
             'pieChart' => $pieChart,
             'floatingChart' => $floatingChart,
+            'directorateTrend' => $directorateTrend,
             'versions' => $versions,
             'defaultVersion' => $defaultVersion,
             'year' => $year,
@@ -39,13 +41,48 @@ class HomeController extends Controller
         $dataChart5Yp = $this->getData5yp($year, $version);
         $pieChart = $this->getProjectByType($year, $version);
         $floatingChart = $this->getProjectByDirectorate($year, $version);
+        $directorateTrend = $this->getDirectorateTrend($year, $version);
 
         return response()->json([
             'dataChart' => $dataChart,
             'dataCostCash5yp' => $dataChart5Yp,
             'pieChart' => $pieChart,
             'floatingChart' => $floatingChart,
+            'directorateTrend' => $directorateTrend,
         ]);
+    }
+
+    public function getDirectorateTrend($startYear, $version = null){
+        $latestVersion = $version ?? BudgetCyclePeriod::where('start_year', $startYear)->max('version');
+        $years = range($startYear, $startYear + 4);
+
+        $projects = Projects::with(['cashCostYearlies', 'budgetCyclePeriod'])
+            ->whereHas('budgetCyclePeriod', function ($query) use ($latestVersion) {
+                $query->where('version', $latestVersion);
+            })
+            ->where('year_period', $startYear)
+            ->whereNot('status_progress', 'CAP')
+            ->get()
+            ->groupBy(function ($project) {
+                return $project->owner_area ?: 'Unassigned';
+            });
+
+        $series = $projects->map(function ($items) use ($years) {
+            return collect($years)->map(function ($year) use ($items) {
+                $amount = $items->sum(function ($item) use ($year) {
+                    return $item->cashCostYearlies
+                        ->where('type', 'cash')
+                        ->where('year', (string) $year)
+                        ->sum('amount');
+                });
+                return round($amount / 1000000, 2);
+            })->toArray();
+        });
+
+        return [
+            'years' => $years,
+            'series' => $series,
+        ];
     }
 
     public function getData5yp($startYear, $version = null){

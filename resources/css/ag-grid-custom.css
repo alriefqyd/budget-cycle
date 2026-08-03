@@ -5,11 +5,17 @@
     --ag-foreground-color: #0b1c30; /* on-surface */
     --ag-secondary-foreground-color: #3e4948; /* on-surface-variant */
     --ag-border-color: #d3e4fe; /* surface-variant, softer than outline-variant */
-    --ag-row-border-color: #eef2f4;
-    --ag-header-background-color: #007e7a; /* primary-container */
-    --ag-header-foreground-color: #ffffff;
+    --ag-row-border-color: #eff4ff; /* surface-container-low — same cool-blue neutral family as everything else */
+    /* Neutral header, but pulled from the app's own token scale (not a
+       one-off gray) so it reads as part of the same surface — a step up from
+       surface-container-lowest (the card/rows) so the header still separates
+       clearly from the body. A fully-saturated teal across dozens of columns
+       is fine for a glance but tiring across hours of continuous use, so
+       brand teal is now just the accent line below instead of the surface. */
+    --ag-header-background-color: #dce9ff; /* surface-container-high */
+    --ag-header-foreground-color: #0b1c30; /* on-surface */
     --ag-header-column-separator-display: block;
-    --ag-header-column-separator-color: rgba(255, 255, 255, 0.16);
+    --ag-header-column-separator-color: rgba(110, 121, 120, 0.3); /* outline */
     --ag-header-column-separator-height: 55%;
 
     /* Rows */
@@ -29,10 +35,11 @@
     --ag-font-family: 'Inter', sans-serif;
     --ag-font-size: 13px;
 
-    /* Density */
-    --ag-cell-horizontal-padding: 16px;
-    --ag-row-height: 44px;
-    --ag-header-height: 46px;
+    /* Density — compact rows read as more modern and let more of a long list
+       fit on screen at once, without going so tight it hurts click targets. */
+    --ag-cell-horizontal-padding: 14px;
+    --ag-row-height: 36px;
+    --ag-header-height: 38px;
     --ag-list-item-height: 32px;
 
     /* Frame: the grid already sits inside a rounded, bordered card, so keep it flush */
@@ -46,6 +53,7 @@
 .ag-theme-alpine .ag-header {
     font-weight: 700;
     letter-spacing: 0.01em;
+    border-bottom: 2px solid #006360; /* primary — brand accent line instead of a fully teal surface */
 }
 
 .ag-theme-alpine .ag-header-cell-label {
@@ -53,7 +61,7 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: #ffffff;
+    color: #0b1c30;
 }
 
 .ag-theme-alpine .ag-header-group-cell-label {
@@ -61,12 +69,12 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: #ffffff;
+    color: #0b1c30;
 }
 
 .ag-theme-alpine .ag-header .ag-icon,
 .ag-theme-alpine .ag-header .ag-header-icon {
-    color: #ffffff;
+    color: #3e4948;
     opacity: 0.85;
 }
 
@@ -76,61 +84,27 @@
     height: auto !important;
 }
 
-/* Column group families — kept semantically identical (Cost / Cash / Total / monthly detail),
-   just re-tinted to the design system palette instead of raw saturated colors. */
-.custom-header-orange {
-    background-color: #8a6a00; /* deep gold — Cost family */
-    min-height: 46px !important;
-}
-
-.custom-header-orange-2 {
-    background-color: #ffe8a3; /* light gold — monthly detail */
-    color: #5a4300 !important;
-    min-height: 46px !important;
-}
-.custom-header-orange-2 .ag-header-cell-label,
-.custom-header-orange-2 .ag-icon {
-    color: #5a4300 !important;
-}
-
-.custom-header-gray {
-    background-color: #c3f0d8; /* light teal — monthly cash detail */
-    color: #005236 !important;
-    min-height: 46px !important;
-}
-.custom-header-gray .ag-header-cell-label,
-.custom-header-gray .ag-icon {
-    color: #005236 !important;
-}
-
-.custom-header-blue {
-    background-color: #ffe8a3; /* light gold — monthly cost detail */
-    color: #5a4300 !important;
-    min-height: 46px !important;
-}
-.custom-header-blue .ag-header-cell-label,
-.custom-header-blue .ag-icon {
-    color: #5a4300 !important;
-}
-
-.custom-header-green {
-    background-color: #00714f; /* tertiary — Cash family */
-    min-height: 46px !important;
+/* Column group families (Cost / Cash / Total / monthly detail) — previously
+   each family got its own saturated fill (gold/teal/dark navy/etc.), a rainbow
+   across 50+ columns. Simplified to one neutral header everywhere; the only
+   two colored things left in the whole grid are the status pill and the
+   negative/positive cell highlight, both of which carry real information
+   rather than just decorating column groups. Grand-total columns keep a
+   slightly heavier weight so they still stand out, just via typography. */
+.custom-header-orange,
+.custom-header-orange-2,
+.custom-header-gray,
+.custom-header-blue,
+.custom-header-green,
+.custom-header-green-2 {
+    background-color: #dce9ff; /* same as the base header — surface-container-high */
 }
 
 .custom-header-red {
-    background-color: #213145; /* inverse-surface — grand Total columns */
-    min-height: 46px !important;
+    background-color: #dce9ff;
 }
-
-.custom-header-green-2 {
-    background-color: #d7f7ea; /* light tertiary — derived "remaining" column */
-    color: #005236 !important;
-    min-height: 46px !important;
-}
-.custom-header-green-2 .ag-header-cell-label,
-.custom-header-green-2 .ag-icon {
-    color: #005236 !important;
+.custom-header-red .ag-header-cell-label {
+    font-weight: 800;
 }
 
 /* Cells */
@@ -138,7 +112,11 @@
     font-size: 13px;
     line-height: 1.25rem;
     color: #0b1c30;
-    vertical-align: middle;
+    /* AG Grid renders .ag-cell as display:block by default, so
+       `vertical-align: middle` (inline/table-cell only) was a no-op —
+       text sat at the top of the row instead of centered. Flex fixes it. */
+    display: flex;
+    align-items: center;
     white-space: nowrap;
     overflow: hidden;
     border-right: 1px solid #eef2f4;
@@ -214,14 +192,16 @@
     border-radius: 6px;
 }
 
-/* Pinned aggregate ("Total") row — neutral, matches "Total Programmed (USD)" summary style */
+/* Pinned aggregate ("Total") row — sits between the header (surface-container-high)
+   and the regular rows (white/surface) in the same token scale, so the whole
+   grid reads as one consistent surface hierarchy instead of mismatched grays. */
 .ag-theme-alpine .ag-row-pinned {
-    background-color: #e5e9eb !important; /* surface-container-highest */
+    background-color: #e5eeff !important; /* surface-container */
     border-top: 2px solid #006360 !important;
     font-weight: 700;
     color: #0b1c30;
 }
 
 .ag-theme-alpine .ag-center-cols-container .ag-row.ag-row-pinned.ag-row-top {
-    background-color: #e5e9eb !important;
+    background-color: #e5eeff !important;
 }

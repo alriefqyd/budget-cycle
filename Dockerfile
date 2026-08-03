@@ -18,6 +18,10 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Set working directory
 WORKDIR /var/www
 
+# Raise memory_limit above the 128M default — bulk Excel imports exhaust it
+# once Debugbar's query collector accumulates enough data (see the .ini for why).
+COPY docker/php/zz-memory-limit.ini /usr/local/etc/php/conf.d/zz-memory-limit.ini
+
 # Copy application code
 COPY . /var/www
 

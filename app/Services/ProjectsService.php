@@ -279,7 +279,8 @@ class ProjectsService
         $dataCostCash = $homeController->getData5yp($year);
         $dataCategory = $homeController->getProjectByType($year);
         $dataOwner = $homeController->getProjectByDirectorate($year);
-        $this->safeBroadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash, $dataCategory, $dataOwner));
+        $dataDirectorateTrend = $homeController->getDirectorateTrend($year);
+        $this->safeBroadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash, $dataCategory, $dataOwner, $dataDirectorateTrend));
     }
 
     public function updateBudgets($year, $id){
@@ -385,6 +386,110 @@ class ProjectsService
         $latestVersion = BudgetCyclePeriod::where('start_year', $period->start_year)->max('version');
 
         return $period->version !== $latestVersion;
+    }
+
+    public function compareVersions($year, $versionA, $versionB){
+        $startYear = (int) $year;
+        $endYear = $startYear + 4;
+
+        $loadVersion = function ($version) use ($year) {
+            return Projects::with(['budgets', 'cashCostYearlies'])
+                ->whereHas('budgetCyclePeriod', function ($query) use ($version) {
+                    $query->where('version', $version);
+                })
+                ->where('year_period', $year)
+                ->get()
+                ->keyBy('sap_code');
+        };
+
+        $projectsA = $loadVersion($versionA);
+        $projectsB = $loadVersion($versionB);
+
+        $sapCodes = $projectsA->keys()->merge($projectsB->keys())->unique()->values();
+
+        $yearlyTotal = function ($project, $type, $year) {
+            if (!$project) {
+                return 0.0;
+            }
+            return (float) $project->cashCostYearlies
+                ->where('type', $type)
+                ->where('year', (string) $year)
+                ->sum('amount');
+        };
+
+        $rows = $sapCodes->map(function ($sapCode) use ($projectsA, $projectsB, $startYear, $endYear, $yearlyTotal) {
+            $projectA = $projectsA->get($sapCode);
+            $projectB = $projectsB->get($sapCode);
+
+            $status = 'unchanged';
+            if (!$projectA) {
+                $status = 'added';
+            } elseif (!$projectB) {
+                $status = 'removed';
+            }
+
+            $costA = (float) ($projectA?->budgets?->total_cost ?? 0);
+            $costB = (float) ($projectB?->budgets?->total_cost ?? 0);
+            $cashA = (float) ($projectA?->budgets?->total_cash ?? 0);
+            $cashB = (float) ($projectB?->budgets?->total_cash ?? 0);
+
+            $row = [
+                'sap_code' => $sapCode,
+                'project_title' => $projectB?->project_title ?? $projectA?->project_title,
+                'directorate' => $projectB?->directorate ?? $projectA?->directorate,
+                'status' => $status,
+                'cost_a' => $costA,
+                'cost_b' => $costB,
+                'cost_delta' => $costB - $costA,
+                'cost_delta_pct' => $costA != 0 ? round((($costB - $costA) / $costA) * 100, 2) : null,
+                'cash_a' => $cashA,
+                'cash_b' => $cashB,
+                'cash_delta' => $cashB - $cashA,
+                'cash_delta_pct' => $cashA != 0 ? round((($cashB - $cashA) / $cashA) * 100, 2) : null,
+            ];
+
+            for ($y = $startYear; $y <= $endYear; $y++) {
+                $row["cost_{$y}_a"] = $yearlyTotal($projectA, 'cost', $y);
+                $row["cost_{$y}_b"] = $yearlyTotal($projectB, 'cost', $y);
+                $row["cash_{$y}_a"] = $yearlyTotal($projectA, 'cash', $y);
+                $row["cash_{$y}_b"] = $yearlyTotal($projectB, 'cash', $y);
+            }
+
+            if ($status === 'unchanged' && ($row['cost_delta'] != 0 || $row['cash_delta'] != 0)) {
+                $row['status'] = 'changed';
+            }
+
+            return $row;
+        })->values();
+
+        $totals = [
+            'cost_a' => $rows->sum('cost_a'),
+            'cost_b' => $rows->sum('cost_b'),
+            'cash_a' => $rows->sum('cash_a'),
+            'cash_b' => $rows->sum('cash_b'),
+        ];
+        $totals['cost_delta'] = $totals['cost_b'] - $totals['cost_a'];
+        $totals['cash_delta'] = $totals['cash_b'] - $totals['cash_a'];
+
+        $yearlyTotals = [];
+        for ($y = $startYear; $y <= $endYear; $y++) {
+            $yearlyTotals[] = [
+                'year' => $y,
+                'cost_a' => $rows->sum("cost_{$y}_a"),
+                'cost_b' => $rows->sum("cost_{$y}_b"),
+                'cash_a' => $rows->sum("cash_{$y}_a"),
+                'cash_b' => $rows->sum("cash_{$y}_b"),
+            ];
+        }
+
+        return [
+            'year' => $startYear,
+            'version_a' => $versionA,
+            'version_b' => $versionB,
+            'rows' => $rows,
+            'totals' => $totals,
+            'yearly_totals' => $yearlyTotals,
+        ];
     }
 
     public function getVersionListByYear($year){

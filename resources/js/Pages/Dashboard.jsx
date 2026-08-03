@@ -9,17 +9,19 @@ import BarChart from "@/Components/BarChart.jsx";
 import BarChartCostCash from "@/Components/BarChartCostCash.jsx";
 import PieChartCategory from "@/Components/PieChartCategory.jsx";
 import FloatingChart from "@/Components/FloatingChart.jsx";
+import StackedTrendByDirectorate from "@/Components/StackedTrendByDirectorate.jsx";
 import {Spinner} from "@/Components/Spinner.jsx"; // for module use
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
 
 
 export default function Dashboard() {
-    const { dataChart, dataCostCash5yp, pieChart, floatingChart, versions, defaultVersion, year } = usePage().props
+    const { dataChart, dataCostCash5yp, pieChart, floatingChart, directorateTrend, versions, defaultVersion, year } = usePage().props
     const [dataChartDashboard, setDataChartDashboard] = useState(dataChart)
     const [dataChartCostCash, setDataChartCostCash] = useState(dataCostCash5yp)
     const [dataCategory, setDataCategory] = useState(pieChart)
     const [dataByDirectorate, setDataByDirectorate] = useState(floatingChart);
+    const [dataDirectorateTrend, setDataDirectorateTrend] = useState(directorateTrend);
     const [version, setVersion] = useState(defaultVersion);
     const [loading, setLoading] = useState(false);
     // this will update data chart if broadcast exist
@@ -30,11 +32,13 @@ export default function Dashboard() {
                 const newDataCostCash = event.dataCostCash;
                 const newDataCategory = event.dataCategory;
                 const newDataByDirectorate = event.dataOwner;
+                const newDataDirectorateTrend = event.dataDirectorateTrend;
 
                 setDataChartDashboard(newData);
                 setDataChartCostCash(newDataCostCash);
                 setDataCategory(newDataCategory);
                 setDataByDirectorate(newDataByDirectorate);
+                setDataDirectorateTrend(newDataDirectorateTrend);
             });
 
         return () => {
@@ -63,6 +67,7 @@ export default function Dashboard() {
         setDataChartCostCash(response.data.dataCostCash5yp)
         setDataCategory(response.data.pieChart)
         setDataByDirectorate(response.data.floatingChart)
+        setDataDirectorateTrend(response.data.directorateTrend)
         setLoading(false)
     }
 
@@ -120,6 +125,10 @@ export default function Dashboard() {
 
                     <div className="col-span-12">
                         <FloatingChart dataChart={dataByDirectorate} year={year} />
+                    </div>
+
+                    <div className="col-span-12">
+                        <StackedTrendByDirectorate dataChart={dataDirectorateTrend} year={year} />
                     </div>
                 </div>
             </div>

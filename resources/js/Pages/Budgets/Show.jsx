@@ -5,12 +5,14 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import "../../../css/ag-grid-custom.css";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.jsx"
+import { computeBudget5YP, distributeAnnualBudget } from "@/Utils/budgetForecast.js"
 
 import {
     ModuleRegistry,
     ClientSideRowModelModule,
     TextFilterModule,
     NumberFilterModule,
+    CustomFilterModule,
     PaginationModule,
     NumberEditorModule,
     TextEditorModule,
@@ -24,17 +26,21 @@ import {
     RowApiModule,
     PinnedRowModule
 } from 'ag-grid-community';
+import Dropdown from "@/Components/Dropdown.jsx";
+import ExcelStyleFilter from "@/Components/Budgets/ExcelStyleFilter.jsx";
 import UploadModal from "@/Components/Budgets/UploadModal.jsx";
 import UploadModalDetail from "@/Components/Budgets/UploadModalDetail.jsx";
 import Swal from "sweetalert2";
 import {Spinner} from "@/Components/Spinner.jsx";
 import Modal from "@/Components/Modal.jsx";
+import ProjectTrendChart from "@/Components/ProjectTrendChart.jsx";
 
 
 ModuleRegistry.registerModules([
     ClientSideRowModelModule,
     TextFilterModule,
     NumberFilterModule,
+    CustomFilterModule,
     PaginationModule,
     NumberEditorModule,
     TextEditorModule,
@@ -49,6 +55,35 @@ ModuleRegistry.registerModules([
     PinnedRowModule
 ]);
 
+const STATUS_BADGE_COLORS = {
+    'new': ['#dcfce7', '#15803d'],
+    'new bc': ['#dcfce7', '#15803d'],
+    'ongoing': ['#fef3c7', '#b45309'],
+};
+
+const StatusBadgeRenderer = (params) => {
+    if (!params.value) return null;
+    const [bg, fg] = STATUS_BADGE_COLORS[params.value.toLowerCase()] || ['#f1f5f9', '#475569'];
+    return (
+        <span
+            style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '2px 10px',
+                borderRadius: '9999px',
+                fontSize: '11px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+                backgroundColor: bg,
+                color: fg,
+            }}
+        >
+            {params.value}
+        </span>
+    );
+};
+
 export default function Show() {
     const gridRef = useRef();
     const lastUpdatedId = useRef(null);
@@ -58,6 +93,7 @@ export default function Show() {
     const [versionList, setVersionList] = useState(versions);
     const [selectedRow, setSelectedRow] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showTrendModal, setShowTrendModal] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
 
     const pathParts = window.location.pathname.split('/');
@@ -72,6 +108,26 @@ export default function Show() {
     const [isFinal, setIsFinal] = useState(budgetVersion.approval_status === 'final');
     const [showFilters, setShowFilters] = useState(false);
     const [deletingData, setDeletingData] = useState(false);
+    const [deletingRowId, setDeletingRowId] = useState(null);
+    const [deletingCount, setDeletingCount] = useState(0);
+    const [kpiTotals, setKpiTotals] = useState({ car: 0, actual: 0, remaining: 0, count: 0 });
+
+    // Summed from whatever's currently passing the grid's filters (not the
+    // full dataset), so the KPI row stays truthful to what's on screen — e.g.
+    // filtering the PM column narrows these totals down to that PM's projects.
+    const recomputeKpiTotals = () => {
+        const api = agGridRef.current?.api;
+        if (!api) return;
+        const totals = { car: 0, actual: 0, remaining: 0, count: 0 };
+        api.forEachNodeAfterFilter((node) => {
+            if (node.data?.sap_code === 'Total') return;
+            totals.car += parseNumber(node.data?.budget_car);
+            totals.actual += parseNumber(node.data?.actual_to_date);
+            totals.remaining += parseNumber(node.data?.budget_5yp);
+            totals.count += 1;
+        });
+        setKpiTotals(totals);
+    };
 
     useEffect(() => {
         fetchVersionList();
@@ -134,6 +190,9 @@ export default function Show() {
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     };
 
+    const isTab2 = activeTab === 'Tab2';
+    const isTab3 = activeTab === 'Tab3';
+
     const generateTwoYearYearly = (year,type) => {
         month.forEach((month,index) => {
             let color = 'custom-header-blue'
@@ -145,7 +204,7 @@ export default function Show() {
                 field: `${type}_${index+1}_${year}`,
                 filter: 'agNumberColumnFilter',
                 minWidth: 170,
-                hide: activeTab === 'Tab1' ? true : false,
+                hide: !isTab2,
                 headerClass: color,
                 valueFormatter: params => formatCurrency(params.value),
             });
@@ -188,21 +247,45 @@ export default function Show() {
             colSpan: params => params.node.rowPinned ? 3 : 1,
             cellStyle: params => params.node.rowPinned ? { textAlign: 'right', fontWeight: 700 } : null,
         },
+        { headerName: "", field: "rowActions", pinned: 'right', width: 36, minWidth: 36, maxWidth: 36, flex: 0,
+            sortable: false, filter: false,
+            editable: false, suppressMovable: true, resizable: false,
+            cellStyle: { padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+            cellRenderer: (params) => {
+                if (params.node.rowPinned || !(isLatestVersion && !isFinal)) return null;
+                const isDeletingThisRow = deletingRowId === params.data.id;
+                return (
+                    <button
+                        onClick={() => handleDelete([params.data])}
+                        title="Delete this row"
+                        disabled={deletingData}
+                        className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-error/60 hover:bg-error/10 hover:text-error transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    >
+                        {isDeletingThisRow ? (
+                            <Spinner color="text-error" size="h-4 w-4" />
+                        ) : (
+                            <span className="material-symbols-outlined text-[15px]">delete</span>
+                        )}
+                    </button>
+                );
+            },
+        },
         { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true,
             headerCheckboxSelection: true},
         { headerName: "Project's Title", field: "project_title",pinned:'left', width: 300},
-        { headerName: "Note", field: "note", filter: 'agTextColumnFilter' },
-        { headerName: "Status", field: "status_progress", filter: 'agTextColumnFilter', cellEditor: 'agSelectCellEditor',cellEditorParams: {
+        { headerName: "Note", field: "note", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.note) } },
+        { headerName: "Status", field: "status_progress", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.status_progress) }, cellEditor: 'agSelectCellEditor',cellEditorParams: {
                 values: ['ongoing', 'new', 'new bc'],
-            } },
-        { headerName: "PM", field: "project_manager", filter: 'agTextColumnFilter', minWidth: 220 },
-        { headerName: "PC", field: "project_control", filter: 'agTextColumnFilter', minWidth: 150 },
-        { headerName: "Directorate", field: "directorate", filter: 'agTextColumnFilter', minWidth: 75 },
-        { headerName: "Owner Area", field: "owner_area", filter: 'agTextColumnFilter', minWidth: 200 },
-        { headerName: "Type of Investment", field: "type_of_investment", filter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
+            }, cellRenderer: StatusBadgeRenderer },
+        { headerName: "PM", field: "project_manager", filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r.project_manager) }, minWidth: 220 },
+        { headerName: "PC", field: "project_control", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.project_control) }, minWidth: 150 },
+        { headerName: "Directorate", field: "directorate", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.directorate) }, minWidth: 75 },
+        { headerName: "Owner Area", field: "owner_area", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.owner_area) }, minWidth: 200 },
+        { headerName: "Type of Investment", field: "type_of_investment", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.type_of_investment) }, minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
             values: ['True Sustaining', 'One-off'],
             } },
-        { headerName: "Category", field: "category", filter: 'agTextColumnFilter', agTextColumnFilter: 'agTextColumnFilter', minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
+        { headerName: "Category", field: "category", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.category) }, minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
             values: ['Process Facilities',
                 'Power',
                 'Process Facilities',
@@ -214,8 +297,8 @@ export default function Show() {
                 'Tailings, Dams and Piles',
             ],
             } },
-        { headerName: "Risk Residual", field: "risk_residual", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
-        { headerName: "Risk Forecast", field: "risk_forecast", filter: 'agTextColumnFilter', minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "Risk Residual", field: "risk_residual", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_residual) }, minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "Risk Forecast", field: "risk_forecast", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_forecast) }, minWidth: 50,enableCellChangeFlash: false },
         { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         {
@@ -254,14 +337,14 @@ export default function Show() {
             ]
         },
 
-       { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: 'agTextColumnFilter' , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
+       { headerName: "Start Year", field: "start_year", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.start_year) } , cellEditor: 'agSelectCellEditor',cellEditorParams: () =>     {
                 const values = [];
                 for (let year = startYear; year <= endYear; year++) {
                     values.push(year.toString()); // Must be strings
                 }
                 return { values };
             } },
-        { headerName: "Budget Year", field: "num_of_year_budget", filter: 'agTextColumnFilter', enableCellChangeFlash: false, minWidth: 150, cellEditor: "agSelectCellEditor",
+        { headerName: "Budget Year", field: "num_of_year_budget", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.num_of_year_budget) }, enableCellChangeFlash: false, minWidth: 150, cellEditor: "agSelectCellEditor",
             cellEditorParams: (params) => {
                 const values = [];
                 const start = parseInt(params.data?.start_year) || new Date().getFullYear();
@@ -276,8 +359,8 @@ export default function Show() {
                 return { values };
             }
         },
-        { headerName: "Fund", field: "fm_new", enableCellChangeFlash: false, filter: 'agTextColumnFilter' },
-        { headerName: "Top",  field: "top",  filter: 'agTextColumnFilter', minWidth:90, hide: activeTab === 'Tab1' ? true : false, cellEditor: "agSelectCellEditor", enableCellChangeFlash: false,
+        { headerName: "Fund", field: "fm_new", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.fm_new) } },
+        { headerName: "Top",  field: "top",  filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.top) }, minWidth:90, hide: !isTab2, cellEditor: "agSelectCellEditor", enableCellChangeFlash: false,
             cellEditorParams: (params) => {
                 const values = [];
                 for (let num = 1; num < 12; num++) {
@@ -302,7 +385,7 @@ export default function Show() {
                     headerClass: 'custom-header-red',
                     editable:false,
                     enableCellChangeFlash: false,
-                    hide: activeTab === 'Tab1'  ? true : false,
+                    hide: !isTab2,
                     valueFormatter: params => formatCurrency(params.value),
                 }
             )
@@ -329,7 +412,7 @@ export default function Show() {
                     field: `cost_${year}_remaining`,
                     filter: 'agNumberColumnFilter',
                     minWidth: 220,
-                    hide: activeTab === 'Tab1'  ? true : false,
+                    hide: !isTab2,
                     headerClass:'custom-header-green-2',
                     enableCellChangeFlash: false,
                     cellClassRules: {
@@ -380,7 +463,7 @@ export default function Show() {
                     headerClass: 'custom-header-red',
                     editable:false,
                     enableCellChangeFlash: false,
-                    hide: activeTab === 'Tab1'  ? true : false,
+                    hide: !isTab2,
                     valueFormatter: params => formatCurrency(params.value),
                 }
             )
@@ -405,7 +488,7 @@ export default function Show() {
                     filter: 'agNumberColumnFilter',
                     minWidth: 220,
                     enableCellChangeFlash: false,
-                    hide: activeTab === 'Tab1' ? true : false,
+                    hide: !isTab2,
                     headerClass:'custom-header-green',
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
@@ -460,6 +543,16 @@ export default function Show() {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         });
+    };
+
+    const formatCompactCurrency = (value) => {
+        const num = Number(value) || 0;
+        const sign = num < 0 ? '-' : '';
+        const abs = Math.abs(num);
+        if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`;
+        if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+        if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
+        return `${sign}$${abs.toFixed(0)}`;
     };
 
     const handleImport = async (data) => {
@@ -647,6 +740,20 @@ export default function Show() {
     };
     const onSelectionChanged = () => {
         const api = agGridRef.current.api;
+
+        // The legacy header "select all" checkbox (needed here so the checkbox
+        // stays embedded in the SAP Code column, not AG Grid's newer auto-injected
+        // selection column) selects every row in the dataset by default, ignoring
+        // the active filter — this caused a real mass-delete incident. Correct it:
+        // anything selected that isn't currently passing the filter gets dropped.
+        const filteredIds = new Set();
+        api.forEachNodeAfterFilter((node) => filteredIds.add(node.id));
+        const overSelectedNodes = api.getSelectedNodes().filter((node) => !filteredIds.has(node.id));
+        if (overSelectedNodes.length > 0) {
+            api.setNodesSelected({ nodes: overSelectedNodes, newValue: false });
+            return;
+        }
+
         const currentlySelected = api.getSelectedRows();
 
         setSelectedRowsState((prevSelected) => {
@@ -784,36 +891,13 @@ export default function Show() {
             })
         }
         const budgetDistribute = (data) => {
+            Object.assign(data, distributeAnnualBudget(data, startYear, endYear));
+
             const years = data['num_of_year_budget'];
-            /* if budget 5yp minus, than will distribute 0 */
             const budgetPerYear = data['budget_5yp'] > 0 ? data['budget_5yp'] / years : 0;
-            const budgetCostPerYear = data['budget_5yp_cost'] > 0 ? data['budget_5yp_cost'] / years : 0;
-            const newStartYear = parseInt(data['start_year']);
-            const newEndYear = newStartYear + parseInt(years) - 1;
-
-            //distribute budget cash cost based on start year
             for (let year = startYear; year <= endYear; year++) {
-                let fieldCost = `cost_${year}`;
-                let fieldCash = `cash_${year}`;
-                //check if start yaer is exist and not zero
-                if(data['start_year'] !== null && data['start_year'] > 2000){
-                    if (year >= newStartYear && year <= newEndYear) {
-                        data[fieldCash] = budgetPerYear;
-                        data[fieldCost] = budgetCostPerYear;
-                    } else {
-                        data[fieldCash] = 0;
-                        data[fieldCost] = 0;
-                    }
-                }
-
                 budgetDistributeMonthly(budgetPerYear, year)
             }
-
-            // if(colDef.field === 'budget_5yp'){
-            //     data['total_cash'] = budgets;
-            // } else {
-            //     data['budget_5yp'] = budgets;
-            // }
 
             updateTotal('cash','total_cash');
             updateTotal('cost','total_cost');
@@ -907,25 +991,8 @@ export default function Show() {
             data[`total_${type}_${year}`] = total;
         }
 
-        const defineBudget5YP = (type) => {
-            let budget5yp = 0;
-            let budgetCar = data['budget_car'];
-            const forecast = data[`forecast_${type}`];
-            // let total = budgetCar - data['actual_to_date'] - forecast;
-
-            data['budget_5yp_cost'] = budgetCar - data['actual_to_date_cost'] - data['forecast_cost']
-            data['budget_5yp'] = budgetCar - data['actual_to_date'] - data['forecast_cash']
-
-            // if(forecast == null) {
-            //     data['budget_5yp_cost'] = budgetCar - data['actual_to_date_cost'] - data['forecast_cost']
-            //     data['budget_5yp'] = budgetCar - data['actual_to_date'] - data['forecast_cash']
-            // } else {
-            //     if(type == 'cost'){
-            //         data[`budget_5yp_cost`] = total;
-            //     } else {
-            //         data['budget_5yp'] = total
-            //     }
-            // }
+        const defineBudget5YP = () => {
+            Object.assign(data, computeBudget5YP(data));
 
             api.refreshCells({
                 rowNodes: [node],
@@ -987,19 +1054,19 @@ export default function Show() {
             replicateCostToCash(data, colDef)
             updateCostMonthlyRemaining(data, colDef)
             updateTotalMonthly('cost', colDef.field.split("_")[2])
-            calculateTotalBudget(data)
+            calculateTotalBudget(api)
 
         }
 
         if(/^cash_(1[0-2]|[1-9])_\d{4}$/.test(colDef.field)) {
             updateCostMonthlyRemaining(data, colDef)
             updateTotalMonthly('cash',colDef.field.split("_")[2])
-            calculateTotalBudget(data)
+            calculateTotalBudget(api)
         }
 
         if (colDef.field === 'budget_5yp' || colDef.field === 'budget_5yp_cost' || colDef.field === 'num_of_year_budget' || colDef.field === 'start_year') {
             budgetDistribute(data);
-            calculateTotalBudget(data)
+            calculateTotalBudget(api)
         }
 
         /*if(colDef.field === 'total_cash'){
@@ -1036,10 +1103,10 @@ export default function Show() {
                 }
             });
 
-            const result = await response.json();
-            if (!response.ok) {
+            const result = response.data;
+            if (!result.success) {
                 console.error("Failed to update budget record:", result);
-                alert("An error occurred while updating the data. Please try again.");
+                alert(result.message || "An error occurred while updating the data. Please try again.");
             }
 
             if (isNew && result.data?.id) {
@@ -1052,9 +1119,18 @@ export default function Show() {
             }
 
             console.log(result.message);
+            recomputeKpiTotals();
         } catch (error) {
             console.error("Update error:", error);
         }
+    };
+
+    const handleViewTrend = () => {
+        if (!selectedRowsState || selectedRowsState.length !== 1) {
+            Swal.fire('Select one project', 'Select exactly one row (checkbox) to view its 5-year trend.', 'info');
+            return;
+        }
+        setShowTrendModal(true);
     };
 
     const handleFullscreen = () => {
@@ -1074,16 +1150,22 @@ export default function Show() {
         }
     };
 
-    const handleDelete = async () => {
+    // Bulk "Delete Data" (Actions dropdown) omits rowsOverride and falls back
+    // to the checkbox selection; the per-row trash-icon button passes its own
+    // single row directly so it doesn't disturb whatever's currently checked.
+    const handleDelete = async (rowsOverride) => {
+        const rows = rowsOverride || selectedRowsState;
 
-        if (!selectedRowsState || selectedRowsState.length === 0) {
+        if (!rows || rows.length === 0) {
             Swal.fire('No rows selected', 'Please select at least one row to delete.', 'warning');
             return;
         }
 
         const result = await Swal.fire({
             title: 'Are you sure?',
-            text: 'This action will permanently delete the selected budgets!',
+            text: rows.length === 1
+                ? `Delete project "${rows[0].project_title || rows[0].sap_code || rows[0].id}"? This cannot be undone!`
+                : `This action will permanently delete ${rows.length} selected budgets!`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
@@ -1094,7 +1176,7 @@ export default function Show() {
 
         if (!result.isConfirmed) return;
 
-        let selectedRows = selectedRowsState.map(row => ({
+        let selectedRows = rows.map(row => ({
             ...row
         }));
 
@@ -1102,6 +1184,8 @@ export default function Show() {
         const query = ids.map(id => `ids[]=${id}`).join('&');
 
         setDeletingData(true);
+        setDeletingCount(rows.length);
+        if (rowsOverride && rowsOverride.length === 1) setDeletingRowId(rowsOverride[0].id);
         try {
             const response = await axios.delete(`/budgets?${query}&year=${startYear}`, {
                 headers: {
@@ -1112,8 +1196,14 @@ export default function Show() {
             setRowData(prevData =>
                 prevData.filter(row => !ids.includes(row.id))
             );
+            // Also remove directly via the grid API: rows created via the "+"
+            // button get their placeholder id swapped for a real one through
+            // an applyTransaction call (not setRowData), so they can be absent
+            // from `rowData` state entirely — filtering state alone wouldn't
+            // touch them on screen.
+            agGridRef.current?.api?.applyTransaction({ remove: selectedRows });
 
-            setSelectedRowsState([]);
+            if (!rowsOverride) setSelectedRowsState([]);
             Swal.fire({
                 icon: 'success',
                 title: 'Deleted',
@@ -1131,6 +1221,8 @@ export default function Show() {
             Swal.fire('Delete failed', lockedSapCodes.length ? `${message} (SAP Code: ${lockedSapCodes.join(', ')})` : message, 'error');
         } finally {
             setDeletingData(false);
+            setDeletingRowId(null);
+            setDeletingCount(0);
         }
     }
 
@@ -1312,113 +1404,19 @@ export default function Show() {
                 </nav>
 
                 {/* Page Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-stack-md">
-                    <h2 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">Budget 5 Year Plan</h2>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md">
+                    <div className="flex items-center gap-stack-md flex-wrap">
+                        <h2 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">Budget Overview</h2>
 
-                    {/* Contextual Toolbar */}
-                    <div className="flex flex-wrap items-center gap-stack-sm">
-                        <button
-                            onClick={() => setShowFilters(prev => !prev)}
-                            className={`inline-flex items-center gap-2 px-stack-md py-2 border rounded-lg font-label-caps text-label-caps transition-all active:scale-95 shadow-sm ${
-                                showFilters
-                                    ? "bg-primary-container text-on-primary-container border-transparent"
-                                    : "border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container"
-                            }`}
-                        >
-                            <span className="material-symbols-outlined text-[18px] opacity-70">
-                                {showFilters ? "filter_alt_off" : "filter_alt"}
-                            </span>
-                            {showFilters ? "Hide Filters" : "Show Filters"}
-                        </button>
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className="inline-flex items-center gap-2 px-stack-md py-2 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container transition-all active:scale-95 shadow-sm"
-                        >
-                            <span className="material-symbols-outlined text-[18px] opacity-70">upload</span>
-                            Import Data
-                        </button>
-                        <button
-                            onClick={handleExport}
-                            className="inline-flex items-center gap-2 px-stack-md py-2 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container transition-all active:scale-95 shadow-sm"
-                        >
-                            {loading ? (
-                                <>
-                                    <Spinner color="text-primary"/>
-                                    <span>Export Data...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="material-symbols-outlined text-[18px] opacity-70">download</span>
-                                    Export Data
-                                </>
-                            )}
-                        </button>
-                        <div className="h-6 w-px bg-outline-variant mx-1"></div>
-                        <button
-                            onClick={handleDelete}
-                            disabled={deletingData}
-                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-error/10 text-error border border-error/20 rounded-lg font-label-caps text-label-caps hover:bg-error/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                            {deletingData ? (
-                                <>
-                                    <Spinner color="text-error"/>
-                                    <span>Deleting...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                                    Delete Data
-                                </>
-                            )}
-                        </button>
-                        <button
-                            onClick={handleDuplicateRow}
-                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-secondary/10 text-secondary border border-secondary/20 rounded-lg font-label-caps text-label-caps hover:bg-secondary/20 transition-all active:scale-95"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                            Duplicate
-                        </button>
-                        <button
-                            onClick={handleFullscreen}
-                            className="inline-flex items-center gap-2 px-stack-md py-2 bg-primary-container text-on-primary-container rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-95 shadow-sm"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">fullscreen</span>
-                            Full Screen
-                        </button>
-                    </div>
-                </div>
-
-                {/* Tab Container */}
-                <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden border border-outline-variant">
-                    <div className="flex flex-wrap items-center justify-between gap-stack-md px-container-padding py-stack-md border-b border-outline-variant bg-white">
-                        <div className="flex items-center p-1 bg-surface-container rounded-xl">
-                            <button
-                                className={`px-5 py-2 rounded-lg font-label-caps text-label-caps transition-all active:scale-95 ${
-                                    activeTab === "Tab1"
-                                        ? "bg-white text-primary font-bold shadow-sm"
-                                        : "text-on-surface-variant hover:text-primary font-medium"
-                                }`}
-                                onClick={() => setActiveTab("Tab1")}
-                            >
-                                Budget 5 Years
-                            </button>
-                            <button
-                                className={`px-5 py-2 rounded-lg font-label-caps text-label-caps transition-all active:scale-95 ${
-                                    activeTab === "Tab2"
-                                        ? "bg-white text-primary font-bold shadow-sm"
-                                        : "text-on-surface-variant hover:text-primary font-medium"
-                                }`}
-                                onClick={() => setActiveTab("Tab2")}
-                            >
-                                Budget Year To Date
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-stack-md">
-                            <div className="flex items-center gap-2 text-on-surface-variant">
-                                <span className="font-label-caps text-label-caps">Version:</span>
+                        {/* Version control — clean select pill; Compare is a normal secondary
+                            button beside it. Delete Version (destructive, rare) moved into the
+                            Actions dropdown instead of sitting right next to the version picker
+                            where it was one misclick away. */}
+                        <div className="flex items-center gap-2">
+                            <span className="font-label-caps text-label-caps text-on-surface-variant opacity-70">Version</span>
+                            <div className="relative">
                                 <select
-                                    className="appearance-none bg-surface border border-outline-variant rounded px-stack-md pr-8 py-1 font-data-tabular text-data-tabular focus:ring-1 focus:ring-primary outline-none"
+                                    className="appearance-none bg-surface border border-outline-variant rounded-lg pl-3 pr-8 py-1.5 font-bold text-on-surface text-sm shadow-sm focus:ring-1 focus:ring-primary outline-none cursor-pointer"
                                     value={versionBudgetPeriod}
                                     onChange={handleChangeVersion}
                                 >
@@ -1428,42 +1426,217 @@ export default function Show() {
                                         </option>
                                     ))}
                                 </select>
+                                <span className="material-symbols-outlined text-[18px] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+                                    expand_more
+                                </span>
+                            </div>
+                            {versionList.length > 1 && (
+                                <Link
+                                    href={`/budgets/${startYear}/compare`}
+                                    title="Compare two versions of this budget cycle"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container hover:text-primary transition-all active:scale-95 shadow-sm"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">compare_arrows</span>
+                                    Compare
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center gap-stack-sm">
+                        <Dropdown>
+                            <Dropdown.Trigger>
+                                <button className="inline-flex items-center gap-2 px-stack-md py-2 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container transition-all active:scale-95 shadow-sm">
+                                    <span className="material-symbols-outlined text-[18px]">more_vert</span>
+                                    Actions
+                                </button>
+                            </Dropdown.Trigger>
+                            <Dropdown.Content align="right" width="64" contentClasses="py-1.5 bg-white w-64">
+                                <button
+                                    onClick={() => setShowFilters(prev => !prev)}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
+                                >
+                                    <span className="material-symbols-outlined text-[18px] opacity-70">
+                                        {showFilters ? "filter_alt_off" : "filter_alt"}
+                                    </span>
+                                    {showFilters ? "Hide Filters" : "Show Filters"}
+                                </button>
+                                <button
+                                    onClick={() => setShowModal(true)}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
+                                >
+                                    <span className="material-symbols-outlined text-[18px] opacity-70">upload</span>
+                                    Import Data
+                                </button>
+                                <button
+                                    onClick={handleExport}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Spinner color="text-primary"/>
+                                            <span>Export Data...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="material-symbols-outlined text-[18px] opacity-70">download</span>
+                                            Export Data
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={handleDuplicateRow}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-secondary hover:bg-surface-container text-left"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                                    Duplicate
+                                </button>
+                                <button
+                                    onClick={handleViewTrend}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-tertiary-container hover:bg-surface-container text-left"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">show_chart</span>
+                                    View Trend
+                                </button>
+                                <div className="my-1 border-t border-outline-variant"></div>
+                                <button
+                                    onClick={() => handleDelete()}
+                                    disabled={deletingData}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-error/10 text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {deletingData ? (
+                                        <>
+                                            <Spinner color="text-error"/>
+                                            <span>Deleting...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            Delete Data
+                                        </>
+                                    )}
+                                </button>
                                 <button
                                     onClick={handleDeleteVersion}
                                     disabled={versionList.length <= 1}
-                                    title="Delete this version and all its data"
-                                    className="inline-flex items-center justify-center w-8 h-8 bg-error/10 text-error border border-error/20 rounded-lg hover:bg-error/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    title={versionList.length <= 1 ? 'This is the only version for this budget cycle' : undefined}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-error/10 text-left disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                                    Delete This Version
                                 </button>
-                            </div>
+                            </Dropdown.Content>
+                        </Dropdown>
 
-                            {isFinal ? (
-                                <span className="inline-flex items-center gap-2 px-stack-md py-2 bg-secondary-container text-on-secondary-container rounded-lg font-label-caps text-label-caps">
+                        {isFinal ? (
+                            <span className="inline-flex items-center gap-2 px-stack-md py-2 bg-secondary-container text-on-secondary-container rounded-lg font-label-caps text-label-caps">
+                                <span className="material-symbols-outlined text-[18px]">lock</span>
+                                Final &amp; Approved
+                            </span>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={handleLock}
+                                    disabled={!isLatestVersion}
+                                    className="inline-flex items-center gap-2 px-stack-md py-2 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container transition-all active:scale-95 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
                                     <span className="material-symbols-outlined text-[18px]">lock</span>
-                                    Final &amp; Approved
-                                </span>
-                            ) : (
-                                <>
-                                    <button
-                                        onClick={handleFinalize}
-                                        disabled={!isLatestVersion}
-                                        className="inline-flex items-center gap-2 px-stack-md py-2 bg-tertiary-container text-on-tertiary-container rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <span className="material-symbols-outlined text-[18px]">task_alt</span>
-                                        Finalize Budget Cycle
-                                    </button>
-                                    <button
-                                        onClick={handleLock}
-                                        disabled={!isLatestVersion}
-                                        className="inline-flex items-center gap-2 px-stack-md py-2 bg-error/10 text-error border border-error/20 rounded-lg font-label-caps text-label-caps hover:bg-error/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <span className="material-symbols-outlined text-[18px]">lock</span>
-                                        Lock &amp; Approve
-                                    </button>
-                                </>
-                            )}
+                                    Lock &amp; Approve
+                                </button>
+                                <button
+                                    onClick={handleFinalize}
+                                    disabled={!isLatestVersion}
+                                    className="inline-flex items-center gap-2 px-stack-md py-2 bg-primary text-on-primary rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-95 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">task_alt</span>
+                                    Finalize Cycle
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* KPI summary — reflects whatever is currently passing the grid's filters */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-stack-sm">
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-on-primary-container text-[16px]">account_balance_wallet</span>
                         </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Total CAR (Approved)</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={formatCurrency(kpiTotals.car)}>
+                                {formatCompactCurrency(kpiTotals.car)}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-on-secondary-container text-[16px]">history</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Actual to Date</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={formatCurrency(kpiTotals.actual)}>
+                                {formatCompactCurrency(kpiTotals.actual)}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${kpiTotals.remaining < 0 ? 'bg-error/15' : 'bg-tertiary-container'}`}>
+                            <span className={`material-symbols-outlined text-[16px] ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-tertiary-container'}`}>savings</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Sisa Forecast (Belum Terpakai)</p>
+                            <p className={`text-lg font-semibold truncate ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-surface'}`} title={formatCurrency(kpiTotals.remaining)}>
+                                {formatCompactCurrency(kpiTotals.remaining)}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-on-surface-variant text-[16px]">folder_open</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Jumlah Project</p>
+                            <p className="text-lg font-semibold text-on-surface truncate">
+                                {kpiTotals.count.toLocaleString('en-US')}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Tab Container */}
+                <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden border border-outline-variant">
+                    <div className="flex items-center justify-between gap-6 px-container-padding border-b border-outline-variant bg-white">
+                        <div className="flex items-center gap-6">
+                            {[
+                                { key: 'Tab1', label: 'Budget 5 Years' },
+                                { key: 'Tab2', label: 'Year To Date' },
+                                { key: 'Tab3', label: 'Forecasts' },
+                            ].map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setActiveTab(tab.key)}
+                                    className={`py-4 border-b-2 font-label-caps text-label-caps tracking-wide transition-colors active:scale-95 ${
+                                        activeTab === tab.key
+                                            ? "border-primary text-primary font-bold"
+                                            : "border-transparent text-on-surface-variant hover:text-primary font-medium"
+                                    }`}
+                                >
+                                    {tab.label.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={handleFullscreen}
+                            title="Full Screen"
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-all active:scale-95 shrink-0"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">fullscreen</span>
+                        </button>
                     </div>
 
                     {loading ? (
@@ -1493,6 +1666,9 @@ export default function Show() {
                                 onSelectionChanged={onSelectionChanged}
                                 getRowId={params => params.data.id}
                                 pinnedTopRowData={calculateTotals(rowData)}
+                                onFilterChanged={recomputeKpiTotals}
+                                onFirstDataRendered={recomputeKpiTotals}
+                                onRowDataUpdated={recomputeKpiTotals}
                             />
                         </div>
                     )}
@@ -1518,10 +1694,36 @@ export default function Show() {
                 loading={loading}
             />
 
+            <Modal show={showTrendModal} onClose={() => setShowTrendModal(false)} maxWidth="6xl">
+                <ProjectTrendChart
+                    project={selectedRowsState?.[0]}
+                    startYear={startYear}
+                    endYear={endYear}
+                />
+                <div className="flex justify-end px-6 pb-6">
+                    <button
+                        onClick={() => setShowTrendModal(false)}
+                        className="px-4 py-2 bg-surface-container text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container-high transition-all"
+                    >
+                        Close
+                    </button>
+                </div>
+            </Modal>
+
             <Modal show={loadingFinalize}>
                 <div className="flex flex-col items-center justify-center h-48 p-4 text-center">
                     <Spinner color="text-primary" />
                     <p className="mt-3 text-on-surface-variant">Loading process finalize, please wait...</p>
+                </div>
+            </Modal>
+
+            {/* Bulk deletes (many rows) block the page with a clear "still working"
+                indicator — a single-row delete already gets its own inline spinner
+                on the trash button, so this only fires for multi-row batches. */}
+            <Modal show={deletingData && deletingCount > 1}>
+                <div className="flex flex-col items-center justify-center h-48 p-4 text-center">
+                    <Spinner color="text-error" />
+                    <p className="mt-3 text-on-surface-variant">Deleting {deletingCount} budgets, please wait...</p>
                 </div>
             </Modal>
 

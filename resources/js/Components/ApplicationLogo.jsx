@@ -1,10 +1,16 @@
-export default function ApplicationLogo(props) {
+export default function ApplicationLogo({ iconOnly = false, ...props }) {
+    // Full logo (V-mark + "VALE" wordmark) uses the original 125.28×64 viewBox.
+    // Icon-only crops to just the V-mark — needed for the collapsed sidebar,
+    // where the full wordmark is too wide to fit and was getting clipped.
+    const viewBox = iconOnly ? "0 0 63 64" : "0 0 125.28 64";
+    const clipWidth = iconOnly ? 63 : 125.28;
+
     return (
-        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="125.28" height="64"
-             viewBox="0 0 125.28 64">
+        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+             viewBox={viewBox} {...props}>
             <defs>
                 <clipPath id="clip-path">
-                    <rect id="Retângulo_43" data-name="Retângulo 43" width="125.28" height="64" fill="none"></rect>
+                    <rect id="Retângulo_43" data-name="Retângulo 43" width={clipWidth} height="64" fill="none"></rect>
                 </clipPath>
             </defs>
             <g id="Vale-logo" transform="translate(-19.607 -48.75)">
