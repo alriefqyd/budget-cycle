@@ -13,6 +13,7 @@ use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
 use App\Models\CashCostYearly;
+use App\Models\ProjectChangeLog;
 use App\Models\Projects;
 use App\Services\ProjectsService;
 use Illuminate\Http\Request;
@@ -32,6 +33,33 @@ class ProjectsController extends Controller
     {
         if (app()->bound('debugbar')) {
             app('debugbar')->disable();
+        }
+    }
+
+    // $changes is the post-save Model::getChanges() result (already excludes
+    // untouched columns); $original is the pre-save attribute snapshot
+    // (Model::getOriginal(), captured before ->update() was called) used to
+    // look up the "before" value for each changed key.
+    private static array $unloggedFields = ['id', 'created_at', 'updated_at', 'project_id', 'budget_cycle_period_id'];
+
+    private function logProjectChanges(Projects $project, array $original, array $changes): void
+    {
+        $userId = auth()->id();
+        foreach ($changes as $field => $newValue) {
+            if (in_array($field, self::$unloggedFields, true)) {
+                continue;
+            }
+            $oldValue = $original[$field] ?? null;
+            if ($oldValue == $newValue) {
+                continue;
+            }
+            ProjectChangeLog::create([
+                'project_id' => $project->id,
+                'user_id' => $userId,
+                'field' => $field,
+                'old_value' => $oldValue,
+                'new_value' => $newValue,
+            ]);
         }
     }
 
@@ -276,9 +304,13 @@ class ProjectsController extends Controller
                     'data' => false
                 ], 423);
             }
+            $projectOriginal = $project->getOriginal();
             $project->update($request->all());
+
             $budget = $project->budgets;
+            $budgetOriginal = [];
             if($budget){
+                $budgetOriginal = $budget->getOriginal();
                 $budget->update($request->all());
             } else {
                 $project->budgets()->create([
@@ -299,6 +331,11 @@ class ProjectsController extends Controller
                     'project_id' => $request->id,
                     'cash_remaining' => $request->cash_remaining,
                 ]);
+            }
+
+            $this->logProjectChanges($project, $projectOriginal, $project->getChanges());
+            if ($budgetOriginal) {
+                $this->logProjectChanges($project, $budgetOriginal, $budget->getChanges());
             }
 
             foreach ($request->all() as $key => $value) {
@@ -362,6 +399,18 @@ class ProjectsController extends Controller
                 'data' => false
             ]);
         }
+    }
+
+    public function history($id)
+    {
+        $logs = ProjectChangeLog::where('project_id', $id)
+            ->with('user:id,name')
+            ->orderByDesc('created_at')
+            ->get();
+        return response()->json([
+            'success' => true,
+            'data' => $logs,
+        ]);
     }
 
     public function destroy(Request $request){

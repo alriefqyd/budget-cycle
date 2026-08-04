@@ -84,6 +84,122 @@ const StatusBadgeRenderer = (params) => {
     );
 };
 
+const CAR_VARIANCE_COLORS = {
+    over: ['#fee2e2', '#b91c1c'],
+    near: ['#fef3c7', '#b45309'],
+    within: ['#dcfce7', '#15803d'],
+    none: ['#f1f5f9', '#64748b'],
+};
+
+const toNum = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    return typeof value === 'number' ? value : parseFloat(String(value).replace(/,/g, '')) || 0;
+};
+
+const formatCompact = (value) => {
+    const num = toNum(value);
+    return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+};
+
+// CAR (Capital Appropriation Request) is the immutable approved baseline for
+// a project. "Used" = what's already been spent (actual_to_date) plus what's
+// now forecast to be spent (forecast_cash) — i.e. budget_car - budget_5yp.
+// Going over 100% means the current forecast would exceed the approved CAR.
+const getCarVariance = (data) => {
+    const budgetCar = toNum(data.budget_car);
+    const actual = toNum(data.actual_to_date);
+    const forecast = toNum(data.forecast_cash);
+    const used = actual + forecast;
+    if (budgetCar <= 0) return { status: 'none', pct: null, label: 'No CAR', used, budgetCar };
+    const usedPct = (used / budgetCar) * 100;
+    if (usedPct > 100) return { status: 'over', pct: usedPct, label: `Over CAR ${usedPct.toFixed(0)}%`, used, budgetCar };
+    if (usedPct >= 90) return { status: 'near', pct: usedPct, label: `Near Limit ${usedPct.toFixed(0)}%`, used, budgetCar };
+    return { status: 'within', pct: usedPct, label: `${usedPct.toFixed(0)}%`, used, budgetCar };
+};
+
+// Flags when the years actually keyed into cash_YYYY drift from what the
+// budget_5yp auto-distribution would produce — e.g. a PM hand-edited one
+// year's cell after the even split ran. Small rounding gaps are ignored.
+const getDistributionMismatch = (data) => {
+    const years = parseInt(data.num_of_year_budget) || 0;
+    const startYear = parseInt(data.start_year) || 0;
+    if (!years || !startYear) return false;
+    let sum = 0;
+    for (let year = startYear; year < startYear + years; year++) {
+        sum += toNum(data[`cash_${year}`]);
+    }
+    return Math.abs(sum - toNum(data.budget_5yp)) > 1;
+};
+
+const CarVarianceRenderer = (params) => {
+    if (params.node.rowPinned) return null;
+    const variance = getCarVariance(params.data);
+    const mismatch = getDistributionMismatch(params.data);
+    const [bg, fg] = CAR_VARIANCE_COLORS[variance.status];
+    const tooltip = `Approved CAR: ${formatCompact(variance.budgetCar)} • Actual + Forecast: ${formatCompact(variance.used)}` +
+        (mismatch ? ' • Distribution across years does not match Budget 5YP' : '');
+    return (
+        <span title={tooltip} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <span
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 10px',
+                    borderRadius: '9999px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    backgroundColor: bg,
+                    color: fg,
+                }}
+            >
+                {variance.label}
+            </span>
+            {mismatch && (
+                <span className="material-symbols-outlined text-[14px] text-amber-600">warning</span>
+            )}
+        </span>
+    );
+};
+
+const HISTORY_FIELD_LABELS = {
+    project_title: "Project's Title",
+    note: "Note",
+    status_progress: "Status",
+    project_manager: "Project Manager",
+    project_control: "Project Control",
+    directorate: "Directorate",
+    owner_area: "Owner Area",
+    type_of_investment: "Type of Investment",
+    category: "Category",
+    risk_forecast: "Risk Forecast",
+    risk_residual: "Risk Residual",
+    fm_new: "FM New",
+    budget_cost: "Budget Cost",
+    actual_to_date: "Actual to Date",
+    actual_to_date_cost: "Actual to Date (Cost)",
+    budget_car: "Budget CAR",
+    bc_budget: "BC Budget",
+    budget_5yp: "Budget 5YP",
+    budget_5yp_cost: "Budget 5YP (Cost)",
+    budget_5yp_cash: "Budget 5YP (Cash)",
+    forecast_cost: "Forecast Cost",
+    forecast_cash: "Forecast Cash",
+    start_year: "Start Year",
+    num_of_year_budget: "Num. of Year Budget",
+    total_cash: "Total Cash",
+    total_cost: "Total Cost",
+    cost_remaining: "Cost Remaining",
+    cash_remaining: "Cash Remaining",
+};
+
+const formatHistoryValue = (value) => {
+    if (value === null || value === undefined || value === '') return '—';
+    if (typeof value === 'string' && value.trim() !== '' && !isNaN(Number(value))) {
+        return Number(value).toLocaleString('en-US');
+    }
+    return String(value);
+};
+
 export default function Show() {
     const gridRef = useRef();
     const lastUpdatedId = useRef(null);
@@ -111,6 +227,22 @@ export default function Show() {
     const [deletingRowId, setDeletingRowId] = useState(null);
     const [deletingCount, setDeletingCount] = useState(0);
     const [kpiTotals, setKpiTotals] = useState({ car: 0, actual: 0, remaining: 0, count: 0 });
+    const [historyProject, setHistoryProject] = useState(null);
+    const [historyLogs, setHistoryLogs] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+
+    const openHistory = async (project) => {
+        setHistoryProject(project);
+        setHistoryLoading(true);
+        try {
+            const response = await axios.get(`/budgets/${project.id}/history`);
+            setHistoryLogs(response.data.data || []);
+        } catch (e) {
+            setHistoryLogs([]);
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
 
     // Summed from whatever's currently passing the grid's filters (not the
     // full dataset), so the KPI row stays truthful to what's on screen — e.g.
@@ -247,26 +379,37 @@ export default function Show() {
             colSpan: params => params.node.rowPinned ? 3 : 1,
             cellStyle: params => params.node.rowPinned ? { textAlign: 'right', fontWeight: 700 } : null,
         },
-        { headerName: "", field: "rowActions", pinned: 'right', width: 36, minWidth: 36, maxWidth: 36, flex: 0,
+        { headerName: "", field: "rowActions", pinned: 'right', width: 64, minWidth: 64, maxWidth: 64, flex: 0,
             sortable: false, filter: false,
             editable: false, suppressMovable: true, resizable: false,
-            cellStyle: { padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+            cellStyle: { padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' },
             cellRenderer: (params) => {
-                if (params.node.rowPinned || !(isLatestVersion && !isFinal)) return null;
+                if (params.node.rowPinned) return null;
                 const isDeletingThisRow = deletingRowId === params.data.id;
                 return (
-                    <button
-                        onClick={() => handleDelete([params.data])}
-                        title="Delete this row"
-                        disabled={deletingData}
-                        className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-error/60 hover:bg-error/10 hover:text-error transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    >
-                        {isDeletingThisRow ? (
-                            <Spinner color="text-error" size="h-4 w-4" />
-                        ) : (
-                            <span className="material-symbols-outlined text-[15px]">delete</span>
+                    <>
+                        <button
+                            onClick={() => openHistory(params.data)}
+                            title="View change history"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-on-surface-variant/60 hover:bg-surface-container-high hover:text-on-surface transition-all active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[15px]">history</span>
+                        </button>
+                        {isLatestVersion && !isFinal && (
+                            <button
+                                onClick={() => handleDelete([params.data])}
+                                title="Delete this row"
+                                disabled={deletingData}
+                                className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-error/60 hover:bg-error/10 hover:text-error transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                            >
+                                {isDeletingThisRow ? (
+                                    <Spinner color="text-error" size="h-4 w-4" />
+                                ) : (
+                                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                                )}
+                            </button>
                         )}
-                    </button>
+                    </>
                 );
             },
         },
@@ -301,6 +444,11 @@ export default function Show() {
         { headerName: "Risk Forecast", field: "risk_forecast", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_forecast) }, minWidth: 50,enableCellChangeFlash: false },
         { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "CAR Status", field: "_car_variance", enableCellChangeFlash: false, editable: false, filter: false,
+            minWidth: 150, sortable: true,
+            valueGetter: params => getCarVariance(params.data).pct,
+            cellRenderer: CarVarianceRenderer,
+        },
         {
             headerName: "Actual Up to 2024 ",
             children: [
@@ -1086,6 +1234,40 @@ export default function Show() {
                 type = null
             }
             defineBudget5YP(type)
+
+            // Guardrail: warn (don't block) when this forecast would exceed
+            // the approved CAR — same underlying condition the "CAR Status"
+            // badge shows, but surfaced immediately at the moment of edit
+            // rather than only passively on the next render.
+            const remainingCash = toNum(data.budget_5yp);
+            const remainingCost = toNum(data.budget_5yp_cost);
+            if (remainingCash < 0 || remainingCost < 0) {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'warning',
+                    title: 'Forecast exceeds approved CAR',
+                    text: `${data.project_title || 'This project'} is over CAR by ${formatCompact(Math.min(remainingCash, remainingCost))}`,
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true,
+                });
+            }
+        }
+
+        if (/^cash_\d{4}$/.test(colDef.field) || ['budget_5yp', 'num_of_year_budget', 'start_year'].includes(colDef.field)) {
+            if (getDistributionMismatch(data)) {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'warning',
+                    title: 'Distribution mismatch',
+                    text: `Yearly cash split for ${data.project_title || 'this project'} no longer sums to Budget 5YP.`,
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true,
+                });
+            }
         }
 
         try {
@@ -1724,6 +1906,56 @@ export default function Show() {
                 <div className="flex flex-col items-center justify-center h-48 p-4 text-center">
                     <Spinner color="text-error" />
                     <p className="mt-3 text-on-surface-variant">Deleting {deletingCount} budgets, please wait...</p>
+                </div>
+            </Modal>
+
+            <Modal show={!!historyProject} onClose={() => setHistoryProject(null)} maxWidth="2xl">
+                <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 className="text-title-md font-semibold text-on-surface">Change History</h3>
+                            <p className="text-body-sm text-on-surface-variant">{historyProject?.project_title}</p>
+                        </div>
+                        <button
+                            onClick={() => setHistoryProject(null)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                    </div>
+
+                    <div className="max-h-[60vh] overflow-y-auto">
+                        {historyLoading ? (
+                            <div className="flex items-center justify-center py-10">
+                                <Spinner color="text-primary" />
+                            </div>
+                        ) : historyLogs.length === 0 ? (
+                            <p className="text-body-sm text-on-surface-variant text-center py-10">No changes recorded yet for this project.</p>
+                        ) : (
+                            <ul className="divide-y divide-surface-container-high">
+                                {historyLogs.map((log) => (
+                                    <li key={log.id} className="py-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium text-on-surface text-body-sm">
+                                                {HISTORY_FIELD_LABELS[log.field] || log.field}
+                                            </span>
+                                            <span className="text-label-caps text-on-surface-variant">
+                                                {new Date(log.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1 text-body-sm">
+                                            <span className="text-error/70 line-through">{formatHistoryValue(log.old_value)}</span>
+                                            <span className="mx-2 text-on-surface-variant">→</span>
+                                            <span className="text-primary font-medium">{formatHistoryValue(log.new_value)}</span>
+                                        </div>
+                                        <p className="mt-0.5 text-label-caps text-on-surface-variant">
+                                            by {log.user?.name || 'Unknown'}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 </div>
             </Modal>
 
