@@ -5,7 +5,7 @@ export default function RowTable(props) {
     const {budget, item, url} = props
 
     const currency = (value) =>
-        `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+        `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     return (
         <tr

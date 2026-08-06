@@ -5,7 +5,7 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import "../../../css/ag-grid-custom.css";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.jsx"
-import { computeBudget5YP, distributeAnnualBudget } from "@/Utils/budgetForecast.js"
+import { computeBudget5YP, distributeAnnualBudget, getCarVariance, getDistributionMismatch, toNum, formatCompact } from "@/Utils/budgetForecast.js"
 
 import {
     ModuleRegistry,
@@ -24,7 +24,10 @@ import {
     HighlightChangesModule,
     UndoRedoEditModule,
     RowApiModule,
-    PinnedRowModule
+    PinnedRowModule,
+    ColumnApiModule,
+    ScrollApiModule,
+    EventApiModule
 } from 'ag-grid-community';
 import Dropdown from "@/Components/Dropdown.jsx";
 import ExcelStyleFilter from "@/Components/Budgets/ExcelStyleFilter.jsx";
@@ -34,6 +37,9 @@ import Swal from "sweetalert2";
 import {Spinner} from "@/Components/Spinner.jsx";
 import Modal from "@/Components/Modal.jsx";
 import ProjectTrendChart from "@/Components/ProjectTrendChart.jsx";
+import PinnableHeader from "@/Components/Budgets/PinnableHeader.jsx";
+import ForecastsDashboard from "@/Components/Budgets/ForecastsDashboard.jsx";
+import ColumnVisibilityPanel from "@/Components/Budgets/ColumnVisibilityPanel.jsx";
 
 
 ModuleRegistry.registerModules([
@@ -52,7 +58,10 @@ ModuleRegistry.registerModules([
     HighlightChangesModule,
     UndoRedoEditModule,
     RowApiModule,
-    PinnedRowModule
+    PinnedRowModule,
+    ColumnApiModule,
+    ScrollApiModule,
+    EventApiModule
 ]);
 
 const STATUS_BADGE_COLORS = {
@@ -91,45 +100,6 @@ const CAR_VARIANCE_COLORS = {
     none: ['#f1f5f9', '#64748b'],
 };
 
-const toNum = (value) => {
-    if (value === null || value === undefined || value === '') return 0;
-    return typeof value === 'number' ? value : parseFloat(String(value).replace(/,/g, '')) || 0;
-};
-
-const formatCompact = (value) => {
-    const num = toNum(value);
-    return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-};
-
-// CAR (Capital Appropriation Request) is the immutable approved baseline for
-// a project. "Used" = what's already been spent (actual_to_date) plus what's
-// now forecast to be spent (forecast_cash) — i.e. budget_car - budget_5yp.
-// Going over 100% means the current forecast would exceed the approved CAR.
-const getCarVariance = (data) => {
-    const budgetCar = toNum(data.budget_car);
-    const actual = toNum(data.actual_to_date);
-    const forecast = toNum(data.forecast_cash);
-    const used = actual + forecast;
-    if (budgetCar <= 0) return { status: 'none', pct: null, label: 'No CAR', used, budgetCar };
-    const usedPct = (used / budgetCar) * 100;
-    if (usedPct > 100) return { status: 'over', pct: usedPct, label: `Over CAR ${usedPct.toFixed(0)}%`, used, budgetCar };
-    if (usedPct >= 90) return { status: 'near', pct: usedPct, label: `Near Limit ${usedPct.toFixed(0)}%`, used, budgetCar };
-    return { status: 'within', pct: usedPct, label: `${usedPct.toFixed(0)}%`, used, budgetCar };
-};
-
-// Flags when the years actually keyed into cash_YYYY drift from what the
-// budget_5yp auto-distribution would produce — e.g. a PM hand-edited one
-// year's cell after the even split ran. Small rounding gaps are ignored.
-const getDistributionMismatch = (data) => {
-    const years = parseInt(data.num_of_year_budget) || 0;
-    const startYear = parseInt(data.start_year) || 0;
-    if (!years || !startYear) return false;
-    let sum = 0;
-    for (let year = startYear; year < startYear + years; year++) {
-        sum += toNum(data[`cash_${year}`]);
-    }
-    return Math.abs(sum - toNum(data.budget_5yp)) > 1;
-};
 
 const CarVarianceRenderer = (params) => {
     if (params.node.rowPinned) return null;
@@ -222,11 +192,10 @@ export default function Show() {
     const [loadingFinalize, setLoadingFinalize] = useState(false)
     const [isLatestVersion, setIsLatestVersion] = useState(true);
     const [isFinal, setIsFinal] = useState(budgetVersion.approval_status === 'final');
-    const [showFilters, setShowFilters] = useState(false);
     const [deletingData, setDeletingData] = useState(false);
     const [deletingRowId, setDeletingRowId] = useState(null);
     const [deletingCount, setDeletingCount] = useState(0);
-    const [kpiTotals, setKpiTotals] = useState({ car: 0, actual: 0, remaining: 0, count: 0 });
+    const [kpiTotals, setKpiTotals] = useState({ car: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 });
     const [historyProject, setHistoryProject] = useState(null);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -250,11 +219,12 @@ export default function Show() {
     const recomputeKpiTotals = () => {
         const api = agGridRef.current?.api;
         if (!api) return;
-        const totals = { car: 0, actual: 0, remaining: 0, count: 0 };
+        const totals = { car: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 };
         api.forEachNodeAfterFilter((node) => {
             if (node.data?.sap_code === 'Total') return;
             totals.car += parseNumber(node.data?.budget_car);
             totals.actual += parseNumber(node.data?.actual_to_date);
+            totals.actualCost += parseNumber(node.data?.actual_to_date_cost);
             totals.remaining += parseNumber(node.data?.budget_5yp);
             totals.count += 1;
         });
@@ -331,10 +301,12 @@ export default function Show() {
             if(type == 'cash') {
                 color = 'custom-header-gray'
             }
+            const monthField = `${type}_${index+1}_${year}`;
             columnDefs.push({
                 headerName: `${toSentenceCase(type)} ${month} - ${year}`,
-                field: `${type}_${index+1}_${year}`,
-                filter: 'agNumberColumnFilter',
+                field: monthField,
+                filter: ExcelStyleFilter,
+                filterParams: { values: rowData.map(r => r[monthField]) },
                 minWidth: 170,
                 hide: !isTab2,
                 headerClass: color,
@@ -442,8 +414,8 @@ export default function Show() {
             } },
         { headerName: "Risk Residual", field: "risk_residual", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_residual) }, minWidth: 50,enableCellChangeFlash: false },
         { headerName: "Risk Forecast", field: "risk_forecast", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_forecast) }, minWidth: 50,enableCellChangeFlash: false },
-        { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: 'agTextColumnFilter',minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.bc_budget) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_car) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "CAR Status", field: "_car_variance", enableCellChangeFlash: false, editable: false, filter: false,
             minWidth: 150, sortable: true,
             valueGetter: params => getCarVariance(params.data).pct,
@@ -456,7 +428,8 @@ export default function Show() {
                     headerName: "Cost",
                     field: "actual_to_date_cost",
                     enableCellChangeFlash: false,
-                    filter: 'agTextColumnFilter',
+                    filter: ExcelStyleFilter,
+                    filterParams: { values: rowData.map(r => r.actual_to_date_cost) },
                     minWidth: 150,
                     valueFormatter: params => formatCurrency(params.value),
                 },
@@ -464,7 +437,8 @@ export default function Show() {
                     headerName: "Cash",
                     field: "actual_to_date",
                     enableCellChangeFlash: false,
-                    filter: 'agTextColumnFilter',
+                    filter: ExcelStyleFilter,
+                    filterParams: { values: rowData.map(r => r.actual_to_date) },
                     minWidth: 150,
                     valueFormatter: params => formatCurrency(params.value)
                 },
@@ -473,15 +447,15 @@ export default function Show() {
         {
             headerName: "A/F 2025",
             children: [
-                { headerName: "Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)}, // Use number filter if this is numeric]
-                { headerName: "Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)} // Use number filter if this is numeric]
+                { headerName: "Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cost) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cash) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)}
             ]
         },
         {
             headerName: 'Budget 5YP',
             children: [
-                { headerName: "Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
-                { headerName: "Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: 'agNumberColumnFilter', minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp_cost) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
             ]
         },
 
@@ -528,7 +502,8 @@ export default function Show() {
                 {
                     headerName: `Total`,
                     field: `total_cost_${year}`,
-                    filter: 'agNumberColumnFilter',
+                    filter: ExcelStyleFilter,
+                    filterParams: { values: rowData.map(r => r[`total_cost_${year}`]) },
                     minWidth: 170,
                     headerClass: 'custom-header-red',
                     editable:false,
@@ -544,7 +519,8 @@ export default function Show() {
         {
             headerName: `Cost - ${year}`,
             field: `cost_${year}`,
-            filter: 'agNumberColumnFilter',
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r[`cost_${year}`]) },
             minWidth: 150,
             hide: hide,
             enableCellChangeFlash: false,
@@ -558,11 +534,13 @@ export default function Show() {
                 {
                     headerName: `Cost - ${year} - Remaining`,
                     field: `cost_${year}_remaining`,
-                    filter: 'agNumberColumnFilter',
+                    filter: ExcelStyleFilter,
+                    filterParams: { values: rowData.map(r => r[`cost_${year}_remaining`]) },
                     minWidth: 220,
                     hide: !isTab2,
                     headerClass:'custom-header-green-2',
                     enableCellChangeFlash: false,
+                    valueFormatter: params => formatCurrency(params.value),
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
                         'positive-value': params => params.value >= 0
@@ -575,7 +553,8 @@ export default function Show() {
     columnDefs.push({
             headerName: "Cost Total",
             field: `total_cost`,
-            filter: 'agTextColumnFilter',
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r.total_cost) },
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
@@ -586,7 +565,8 @@ export default function Show() {
         {
             headerName: "Cost Remaining",
             field: 'cost_remaining',
-            filter: 'agTextColumnFilter',
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r.cost_remaining) },
             minWidth: 150,
             editable: false,
             headerClass:'custom-header-orange',
@@ -606,7 +586,8 @@ export default function Show() {
                 {
                     headerName: `Total Cash - ${year}`,
                     field: `total_cash_${year}`,
-                    filter: 'agNumberColumnFilter',
+                    filter: ExcelStyleFilter,
+                    filterParams: { values: rowData.map(r => r[`total_cash_${year}`]) },
                     minWidth: 170,
                     headerClass: 'custom-header-red',
                     editable:false,
@@ -620,7 +601,8 @@ export default function Show() {
         columnDefs.push({
             headerName: `Cash - ${year}`,
             field: `cash_${year}`,
-            filter: 'agNumberColumnFilter',
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r[`cash_${year}`]) },
             minWidth: 150,
             enableCellChangeFlash: false,
             headerClass:'custom-header-green',
@@ -633,11 +615,13 @@ export default function Show() {
                 {
                     headerName: `Cash - ${year} - Remaining`,
                     field: `cash_${year}_remaining`,
-                    filter: 'agNumberColumnFilter',
+                    filter: ExcelStyleFilter,
+                    filterParams: { values: rowData.map(r => r[`cash_${year}_remaining`]) },
                     minWidth: 220,
                     enableCellChangeFlash: false,
                     hide: !isTab2,
                     headerClass:'custom-header-green',
+                    valueFormatter: params => formatCurrency(params.value),
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
                         'positive-value': params => params.value >= 0
@@ -651,7 +635,8 @@ export default function Show() {
         {
             headerName: "Cash Total",
             field: `total_cash`,
-            filter: 'agTextColumnFilter',
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r.total_cash) },
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
@@ -662,7 +647,8 @@ export default function Show() {
         {
             headerName: "Cash Remaining",
             field: 'cash_remaining',
-            filter: 'agTextColumnFilter',
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r.cash_remaining) },
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
@@ -680,10 +666,10 @@ export default function Show() {
         resizable: true,
         sortable: true,
         filter: true,
-        floatingFilter: showFilters,
         flex: 1,
         minWidth: 120,
         editable: true,
+        headerComponent: PinnableHeader,
     }
     const formatCurrency = (value) => {
         if (value == null || isNaN(value)) return '';
@@ -1332,6 +1318,22 @@ export default function Show() {
         }
     };
 
+    // Jumps from an ExceptionList row (Forecasts tab) back to the editable
+    // grid, scrolled and flashed on that exact row, instead of leaving the
+    // user to hunt for it again across the full column set.
+    const handleSelectExceptionProject = (project) => {
+        setActiveTab('Tab1');
+        setTimeout(() => {
+            const api = agGridRef.current?.api;
+            if (!api) return;
+            const node = api.getRowNode(project.id);
+            if (node) {
+                api.ensureNodeVisible(node, 'middle');
+                api.flashCells({ rowNodes: [node] });
+            }
+        }, 100);
+    };
+
     // Bulk "Delete Data" (Actions dropdown) omits rowsOverride and falls back
     // to the checkbox selection; the per-row trash-icon button passes its own
     // single row directly so it doesn't disturb whatever's currently checked.
@@ -1627,6 +1629,9 @@ export default function Show() {
 
                     {/* Actions */}
                     <div className="flex flex-wrap items-center gap-stack-sm">
+                        {!isTab3 && (
+                            <ColumnVisibilityPanel api={agGridRef.current?.api} columnDefs={columnDefs} />
+                        )}
                         <Dropdown>
                             <Dropdown.Trigger>
                                 <button className="inline-flex items-center gap-2 px-stack-md py-2 border border-outline-variant bg-surface text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container transition-all active:scale-95 shadow-sm">
@@ -1635,15 +1640,6 @@ export default function Show() {
                                 </button>
                             </Dropdown.Trigger>
                             <Dropdown.Content align="right" width="64" contentClasses="py-1.5 bg-white w-64">
-                                <button
-                                    onClick={() => setShowFilters(prev => !prev)}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
-                                >
-                                    <span className="material-symbols-outlined text-[18px] opacity-70">
-                                        {showFilters ? "filter_alt_off" : "filter_alt"}
-                                    </span>
-                                    {showFilters ? "Hide Filters" : "Show Filters"}
-                                </button>
                                 <button
                                     onClick={() => setShowModal(true)}
                                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
@@ -1759,8 +1755,12 @@ export default function Show() {
                         </div>
                         <div className="min-w-0">
                             <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Actual to Date</p>
-                            <p className="text-lg font-semibold text-on-surface truncate" title={formatCurrency(kpiTotals.actual)}>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={`Cash: ${formatCurrency(kpiTotals.actual)}`}>
                                 {formatCompactCurrency(kpiTotals.actual)}
+                                <span className="text-body-sm font-normal text-on-surface-variant"> Cash</span>
+                            </p>
+                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Cost: ${formatCurrency(kpiTotals.actualCost)}`}>
+                                {formatCompactCurrency(kpiTotals.actualCost)} Cost
                             </p>
                         </div>
                     </div>
@@ -1826,6 +1826,14 @@ export default function Show() {
                             <Spinner color="text-primary"/>
                             Loading data, please wait...
                         </div>
+                    ) : isTab3 ? (
+                        <ForecastsDashboard
+                            rowData={rowData}
+                            startYear={startYear}
+                            yearlyBudget={yearlyBudget}
+                            year={startYear}
+                            onSelectProject={handleSelectExceptionProject}
+                        />
                     ) : (
                         <div ref={gridRef} className="ag-theme-alpine"
                              style={{height: "calc(100vh - 260px)", width: "100%"}}>

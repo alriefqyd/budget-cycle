@@ -16,7 +16,9 @@ const ExcelStyleFilter = (props) => {
 
     const optionValues = useMemo(() => {
         const unique = new Set(values.map((v) => (v === null || v === undefined || v === '' ? BLANK_LABEL : v)));
-        return Array.from(unique).sort((a, b) => a.localeCompare(b));
+        // String() guards numeric values (money/year columns) — raw numbers
+        // don't have .localeCompare.
+        return Array.from(unique).sort((a, b) => String(a).localeCompare(String(b)));
     }, [values]);
 
     const [selected, setSelected] = useState(() => new Set(model?.values ?? optionValues));

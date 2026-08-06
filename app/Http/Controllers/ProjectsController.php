@@ -545,6 +545,20 @@ class ProjectsController extends Controller
         }
     }
 
+    public function versionTrend($year){
+        try {
+            $projectService = new ProjectsService;
+            $trend = $projectService->getVersionTrend($year);
+
+            return response()->json([
+                'status' => 200,
+                'trend' => $trend,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
     public function getVersionList($year){
         try {
             $projectService = new ProjectsService;

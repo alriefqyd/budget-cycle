@@ -7,6 +7,43 @@ const toNumber = (value) => {
     return typeof value === 'number' ? value : parseFloat(String(value).replace(/,/g, '')) || 0;
 };
 
+export const toNum = toNumber;
+
+export const formatCompact = (value) => {
+    const num = toNumber(value);
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// CAR (Capital Appropriation Request) is the immutable approved baseline for
+// a project. "Used" = what's already been spent (actual_to_date) plus what's
+// now forecast to be spent (forecast_cash) — i.e. budget_car - budget_5yp.
+// Going over 100% means the current forecast would exceed the approved CAR.
+export function getCarVariance(data) {
+    const budgetCar = toNumber(data.budget_car);
+    const actual = toNumber(data.actual_to_date);
+    const forecast = toNumber(data.forecast_cash);
+    const used = actual + forecast;
+    if (budgetCar <= 0) return { status: 'none', pct: null, label: 'No CAR', used, budgetCar };
+    const usedPct = (used / budgetCar) * 100;
+    if (usedPct > 100) return { status: 'over', pct: usedPct, label: `Over CAR ${usedPct.toFixed(0)}%`, used, budgetCar };
+    if (usedPct >= 90) return { status: 'near', pct: usedPct, label: `Near Limit ${usedPct.toFixed(0)}%`, used, budgetCar };
+    return { status: 'within', pct: usedPct, label: `${usedPct.toFixed(0)}%`, used, budgetCar };
+}
+
+// Flags when the years actually keyed into cash_YYYY drift from what the
+// budget_5yp auto-distribution would produce — e.g. a PM hand-edited one
+// year's cell after the even split ran. Small rounding gaps are ignored.
+export function getDistributionMismatch(data) {
+    const years = parseInt(data.num_of_year_budget) || 0;
+    const startYear = parseInt(data.start_year) || 0;
+    if (!years || !startYear) return false;
+    let sum = 0;
+    for (let year = startYear; year < startYear + years; year++) {
+        sum += toNumber(data[`cash_${year}`]);
+    }
+    return Math.abs(sum - toNumber(data.budget_5yp)) > 1;
+}
+
 // budget_5yp = remaining CAR balance not yet drawn: the approved CAR minus
 // what's already been spent (actual_to_date) minus what the PM now forecasts
 // spending (forecast_cost/forecast_cash). The CAR total (budget_car) itself

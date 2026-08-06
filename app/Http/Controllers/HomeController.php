@@ -11,6 +11,8 @@ use Inertia\Inertia;
 class HomeController extends Controller
 {
     public function index(){
+        // The dashboard follows next year's cycle — capital budgeting for a
+        // given year is planned/forecasted during the prior calendar year.
         $year = date('Y') + 1;
         $dataChart = $this->getCashCostYearly($year);
         $dataChart5Yp = $this->getData5yp($year);

@@ -501,6 +501,41 @@ class ProjectsService
         return $versions;
     }
 
+    // Totals CAR/Actual/Forecast/remaining-CAR (budget_5yp) across every
+    // project, per version, oldest to newest — so a supervisor can see how
+    // the whole cycle's numbers drifted from one finalize to the next instead
+    // of only comparing two hand-picked versions (see compareVersions above).
+    public function getVersionTrend($year)
+    {
+        $versions = $this->getVersionListByYear($year)->sort()->values();
+
+        $series = $versions->map(function ($version) use ($year) {
+            $period = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->first();
+
+            $projects = Projects::with('budgets')
+                ->whereHas('budgetCyclePeriod', function ($query) use ($version) {
+                    $query->where('version', $version);
+                })
+                ->where('year_period', $year)
+                ->get();
+
+            return [
+                'version' => $version,
+                'approval_status' => $period?->approval_status,
+                'project_count' => $projects->count(),
+                'total_car' => (float) $projects->sum(fn ($p) => $p->budgets?->budget_car ?? 0),
+                'total_actual' => (float) $projects->sum(fn ($p) => $p->budgets?->actual_to_date ?? 0),
+                'total_forecast' => (float) $projects->sum(fn ($p) => $p->budgets?->forecast_cash ?? 0),
+                'total_budget_5yp' => (float) $projects->sum(fn ($p) => $p->budgets?->budget_5yp ?? 0),
+            ];
+        })->values();
+
+        return [
+            'year' => (int) $year,
+            'series' => $series,
+        ];
+    }
+
     function getVersionStatusLabel($dataPeriod) {
         if (!isset($dataPeriod->approval_status)) {
             return 'N/A';

@@ -58,7 +58,7 @@ export default function PieChartCategory({ dataChart, cols, year }) {
                         let value = context.raw;
                         return viewType === 'count'
                             ? `${value} projects`
-                            : `$ ${value.toLocaleString()}`;
+                            : `$ ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     }
                 }
             },
@@ -75,7 +75,7 @@ export default function PieChartCategory({ dataChart, cols, year }) {
                                 return {
                                     text: `${label} - ${viewType === 'count'
                                         ? value.toLocaleString() + ' projects'
-                                        : '$' + value.toLocaleString()}`,
+                                        : '$' + value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                                     fillStyle: dataset.backgroundColor[i],
                                     index: i
                                 };
@@ -90,7 +90,7 @@ export default function PieChartCategory({ dataChart, cols, year }) {
                 font: { weight: 'bold', size: 12 },
                 formatter: (value) => viewType === 'count'
                     ? value.toLocaleString()
-                    : `$ ${value.toLocaleString()}`,
+                    : `$ ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             }
         }
     };

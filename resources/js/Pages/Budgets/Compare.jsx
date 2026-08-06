@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Head, usePage, Link } from "@inertiajs/react";
 import axios from "axios";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.jsx";
@@ -21,7 +21,7 @@ export default function Compare() {
     const [loading, setLoading] = useState(false);
 
     const currency = (value) =>
-        `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+        `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const percent = (value) => (value === null || value === undefined ? "—" : `${value > 0 ? "+" : ""}${value}%`);
 
@@ -50,6 +50,20 @@ export default function Compare() {
     };
 
     const { rows, totals, yearly_totals: yearlyTotals } = comparison;
+
+    const [showUnchanged, setShowUnchanged] = useState(false);
+    const unchangedCount = useMemo(() => rows.filter(r => r.status === 'unchanged').length, [rows]);
+
+    // Biggest movers first — the whole point of this table is spotting which
+    // projects drove the version-to-version change, so burying them under 600
+    // "unchanged" rows in insertion order defeats the purpose.
+    const visibleRows = useMemo(() => {
+        const filtered = showUnchanged ? rows : rows.filter(r => r.status !== 'unchanged');
+        return [...filtered].sort((a, b) => {
+            const magnitude = (r) => Math.max(Math.abs(r.cost_delta || 0), Math.abs(r.cash_delta || 0));
+            return magnitude(b) - magnitude(a);
+        });
+    }, [rows, showUnchanged]);
 
     return (
         <AuthenticatedLayout>
@@ -101,12 +115,22 @@ export default function Compare() {
                 <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
                     <div className="bg-primary px-container-padding py-4 flex items-center justify-between">
                         <h4 className="font-title-sm text-title-sm text-white font-bold">Project-Level Variance</h4>
-                        <span className="text-[11px] text-white/80">Matched by SAP Code</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-[11px] text-white/80">Matched by SAP Code • sorted by biggest change</span>
+                            {unchangedCount > 0 && (
+                                <button
+                                    onClick={() => setShowUnchanged(prev => !prev)}
+                                    className="text-[11px] font-bold text-white bg-white/15 hover:bg-white/25 rounded-full px-3 py-1 transition-colors"
+                                >
+                                    {showUnchanged ? 'Hide' : 'Show'} unchanged ({unchangedCount})
+                                </button>
+                            )}
+                        </div>
                     </div>
-                    <div className="overflow-x-auto custom-scrollbar">
+                    <div className="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[32rem]">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-surface-container-low border-b border-outline-variant">
+                                <tr className="sticky top-0 z-10 bg-surface-container-low border-b border-outline-variant">
                                     <th className="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant uppercase">SAP Code</th>
                                     <th className="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant uppercase">Project</th>
                                     <th className="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant uppercase text-center">Status</th>
@@ -115,7 +139,7 @@ export default function Compare() {
                                 </tr>
                             </thead>
                             <tbody className="font-data-tabular text-data-tabular divide-y divide-outline-variant/30">
-                                {rows.map((row) => (
+                                {visibleRows.map((row) => (
                                     <tr key={row.sap_code} className="hover:bg-primary-container/5">
                                         <td className="px-4 py-3">{row.sap_code}</td>
                                         <td className="px-4 py-3">{row.project_title}</td>
@@ -136,10 +160,12 @@ export default function Compare() {
                                         </td>
                                     </tr>
                                 ))}
-                                {rows.length === 0 && (
+                                {visibleRows.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant">
-                                            No projects found for either version.
+                                            {rows.length === 0
+                                                ? 'No projects found for either version.'
+                                                : 'No changed projects between these versions. All projects are unchanged.'}
                                         </td>
                                     </tr>
                                 )}

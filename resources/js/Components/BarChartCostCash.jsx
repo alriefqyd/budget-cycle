@@ -76,7 +76,7 @@ export default function BarChartCostCash({dataChart, cols, year}) {
 
                 },
                 formatter: function (value) {
-                    return value?.toLocaleString(); // Adds commas
+                    return value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 },
             },
         },

@@ -67,7 +67,7 @@ export default function Budgets() {
     const costRatio = totalCash > 0 ? Math.min(100, Math.round((totalCost / totalCash) * 100)) : 0;
     const latestCycle = [...projectState].sort((a, b) => b.start_year - a.start_year)[0];
     const currency = (value) =>
-        `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+        `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     return (
         <AuthenticatedLayout>

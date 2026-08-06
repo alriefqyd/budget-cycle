@@ -31,6 +31,7 @@ Route::put('/budgets-finalize/{year}/{version}', [\App\Http\Controllers\Projects
 Route::put('/budgets-lock/{year}/{version}', [\App\Http\Controllers\ProjectsController::class, 'lock'])->middleware(['auth'])->name('budget-lock');
 Route::get('/budgets-version/{year}/{version}', [\App\Http\Controllers\ProjectsController::class, 'getBudgetByYearAndVersion'])->middleware(['auth'])->name('budget-version-show');
 Route::get('/budgets-versions/{year}/', [\App\Http\Controllers\ProjectsController::class, 'getVersionList'])->middleware(['auth'])->name('budget-version-list');
+Route::get('/budgets-trend/{year}', [\App\Http\Controllers\ProjectsController::class, 'versionTrend'])->middleware(['auth'])->name('budget-version-trend');
 Route::delete('/budgets-version/{year}/{version}', [\App\Http\Controllers\ProjectsController::class, 'deleteVersion'])->middleware(['auth'])->name('budget-version-delete');
 Route::post('/budgets/', [\App\Http\Controllers\ProjectsController::class, 'store'])->middleware(['auth'])->name('budget-create');
 Route::delete('/budgets', [\App\Http\Controllers\ProjectsController::class, 'destroy'])->middleware(['auth'])->name('budget-delete');

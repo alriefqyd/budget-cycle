@@ -45,7 +45,7 @@ export default function ProjectTrendChart({ project, startYear, endYear }) {
                 offset: -20,
                 color: 'black',
                 font: { weight: 'bold', size: 13 },
-                formatter: (value) => value?.toLocaleString(),
+                formatter: (value) => value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             },
         },
         scales: {

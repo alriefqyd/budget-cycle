@@ -53,7 +53,7 @@ export default function BarChartVersionCompare({ yearlyTotals, versionA, version
                 offset: -20,
                 color: 'black',
                 font: { weight: 'bold', size: 12 },
-                formatter: (value) => value?.toLocaleString(),
+                formatter: (value) => value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             },
         },
         interaction: {
