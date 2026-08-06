@@ -62,13 +62,6 @@ export default function Budgets() {
         }
     };
 
-    const totalCash = projectState.reduce((sum, p) => sum + (Number(p.total_cash) || 0), 0);
-    const totalCost = projectState.reduce((sum, p) => sum + (Number(p.total_cost) || 0), 0);
-    const costRatio = totalCash > 0 ? Math.min(100, Math.round((totalCost / totalCash) * 100)) : 0;
-    const latestCycle = [...projectState].sort((a, b) => b.start_year - a.start_year)[0];
-    const currency = (value) =>
-        `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
     return (
         <AuthenticatedLayout>
             <Head title="Budget Overview" />
@@ -116,56 +109,6 @@ export default function Budgets() {
                             <span className="material-symbols-outlined text-[20px]">add_circle</span>
                             <span className="font-label-caps text-label-caps">Create New Budget Cycle</span>
                         </button>
-                    </div>
-                </div>
-
-                {/* Bento Grid Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-stack-md">
-                    <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm group hover:border-primary/40 transition-colors">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-3 bg-tertiary-container/10 rounded-lg">
-                                <span className="material-symbols-outlined text-tertiary-container">payments</span>
-                            </div>
-                            <span className="font-label-caps text-label-caps text-tertiary-container bg-tertiary-container/10 px-2 py-1 rounded">
-                                {projectState.length} cycle{projectState.length !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-                        <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">CASH TOTAL</p>
-                        <h3 className="font-display-lg text-display-lg text-on-surface font-black">{currency(totalCash)}</h3>
-                        <p className="text-[11px] text-outline mt-2 italic">Sum across all budget cycles</p>
-                    </div>
-
-                    <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm group hover:border-primary/40 transition-colors">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-3 bg-primary-container/10 rounded-lg">
-                                <span className="material-symbols-outlined text-primary-container">account_balance</span>
-                            </div>
-                            <span className="font-label-caps text-label-caps text-primary bg-primary-container/10 px-2 py-1 rounded">
-                                {costRatio}% OF CASH
-                            </span>
-                        </div>
-                        <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">COST TOTAL</p>
-                        <h3 className="font-display-lg text-display-lg text-on-surface font-black">{currency(totalCost)}</h3>
-                        <div className="w-full bg-surface-container-high h-1.5 rounded-full mt-4 overflow-hidden">
-                            <div className="bg-primary h-full" style={{ width: `${costRatio}%` }}></div>
-                        </div>
-                    </div>
-
-                    <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm group hover:border-primary/40 transition-colors">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-3 bg-secondary-container/10 rounded-lg">
-                                <span className="material-symbols-outlined text-secondary">assignment_turned_in</span>
-                            </div>
-                        </div>
-                        <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">LATEST CYCLE STATUS</p>
-                        <div className="flex items-center gap-3">
-                            <span className="px-4 py-2 bg-secondary-container text-on-secondary-fixed font-bold rounded-lg text-title-sm tracking-tight">
-                                {latestCycle ? latestCycle.status : 'N/A'}
-                            </span>
-                        </div>
-                        <p className="font-body-sm text-body-sm text-outline mt-4">
-                            {latestCycle ? `Cycle ${latestCycle.start_year} - ${latestCycle.end_year}` : 'No cycles yet'}
-                        </p>
                     </div>
                 </div>
 
