@@ -8,7 +8,8 @@ import Swal from "sweetalert2";
 import axios from "axios";
 
 export default function Budgets() {
-    const { projects } = usePage().props;
+    const { projects, auth } = usePage().props;
+    const isViewer = auth.user.role === 'viewer';
     const [projectState, setProjectState] = useState(projects);
     const [modalType, setModalType] = useState('excel')
     const [showModal, setShowModal] = useState(false);
@@ -77,39 +78,41 @@ export default function Budgets() {
                         </nav>
                         <h2 className="font-headline-md text-headline-md text-on-surface">Budget Overview</h2>
                     </div>
-                    <div className="flex gap-stack-sm">
-                        <button
-                            onClick={() => {
-                                setShowModal(true);
-                                setModalType('excel');
-                            }}
-                            disabled={loading}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-lowest border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50"
-                        >
-                            {loading ? (
-                                <>
-                                    <Spinner color="text-primary" />
-                                    <span className="font-label-caps text-label-caps">Uploading...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="material-symbols-outlined text-[20px]">upload_file</span>
-                                    <span className="font-label-caps text-label-caps">Upload Excel</span>
-                                </>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => {
-                                setShowModal(true);
-                                setModalType('form');
-                            }}
-                            disabled={loading}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary font-bold rounded-lg shadow-md hover:brightness-110 transition-all disabled:opacity-50"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                            <span className="font-label-caps text-label-caps">Create New Budget Cycle</span>
-                        </button>
-                    </div>
+                    {!isViewer && (
+                        <div className="flex gap-stack-sm">
+                            <button
+                                onClick={() => {
+                                    setShowModal(true);
+                                    setModalType('excel');
+                                }}
+                                disabled={loading}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-lowest border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Spinner color="text-primary" />
+                                        <span className="font-label-caps text-label-caps">Uploading...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                                        <span className="font-label-caps text-label-caps">Upload Excel</span>
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowModal(true);
+                                    setModalType('form');
+                                }}
+                                disabled={loading}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary font-bold rounded-lg shadow-md hover:brightness-110 transition-all disabled:opacity-50"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                                <span className="font-label-caps text-label-caps">Create New Budget Cycle</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Detailed Breakdown Card */}

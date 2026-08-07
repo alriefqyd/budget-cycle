@@ -173,7 +173,8 @@ const formatHistoryValue = (value) => {
 export default function Show() {
     const gridRef = useRef();
     const lastUpdatedId = useRef(null);
-    const { projects, year, budgets, versions, budgetVersion} = usePage().props
+    const { projects, year, budgets, versions, budgetVersion, auth} = usePage().props
+    const isViewer = auth.user.role === 'viewer';
     const [activeTab, setActiveTab] = useState('Tab1');
     const [versionBudgetPeriod, setVersionBudgetPeriod] = useState(budgetVersion.version);
     const [versionList, setVersionList] = useState(versions);
@@ -367,7 +368,7 @@ export default function Show() {
                         >
                             <span className="material-symbols-outlined text-[15px]">history</span>
                         </button>
-                        {isLatestVersion && !isFinal && (
+                        {isLatestVersion && !isFinal && !isViewer && (
                             <button
                                 onClick={() => handleDelete([params.data])}
                                 title="Delete this row"
@@ -1640,13 +1641,15 @@ export default function Show() {
                                 </button>
                             </Dropdown.Trigger>
                             <Dropdown.Content align="right" width="64" contentClasses="py-1.5 bg-white w-64">
-                                <button
-                                    onClick={() => setShowModal(true)}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
-                                >
-                                    <span className="material-symbols-outlined text-[18px] opacity-70">upload</span>
-                                    Import Data
-                                </button>
+                                {!isViewer && (
+                                    <button
+                                        onClick={() => setShowModal(true)}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px] opacity-70">upload</span>
+                                        Import Data
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleExport}
                                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
@@ -1663,13 +1666,15 @@ export default function Show() {
                                         </>
                                     )}
                                 </button>
-                                <button
-                                    onClick={handleDuplicateRow}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-secondary hover:bg-surface-container text-left"
-                                >
-                                    <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                                    Duplicate
-                                </button>
+                                {!isViewer && (
+                                    <button
+                                        onClick={handleDuplicateRow}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-secondary hover:bg-surface-container text-left"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                                        Duplicate
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleViewTrend}
                                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-tertiary-container hover:bg-surface-container text-left"
@@ -1677,33 +1682,37 @@ export default function Show() {
                                     <span className="material-symbols-outlined text-[18px]">show_chart</span>
                                     View Trend
                                 </button>
-                                <div className="my-1 border-t border-outline-variant"></div>
-                                <button
-                                    onClick={() => handleDelete()}
-                                    disabled={deletingData}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-error/10 text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    {deletingData ? (
-                                        <>
-                                            <Spinner color="text-error"/>
-                                            <span>Deleting...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                                            Delete Data
-                                        </>
-                                    )}
-                                </button>
-                                <button
-                                    onClick={handleDeleteVersion}
-                                    disabled={versionList.length <= 1}
-                                    title={versionList.length <= 1 ? 'This is the only version for this budget cycle' : undefined}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-error/10 text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                                    Delete This Version
-                                </button>
+                                {!isViewer && (
+                                    <>
+                                        <div className="my-1 border-t border-outline-variant"></div>
+                                        <button
+                                            onClick={() => handleDelete()}
+                                            disabled={deletingData}
+                                            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-error/10 text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            {deletingData ? (
+                                                <>
+                                                    <Spinner color="text-error"/>
+                                                    <span>Deleting...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                    Delete Data
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={handleDeleteVersion}
+                                            disabled={versionList.length <= 1}
+                                            title={versionList.length <= 1 ? 'This is the only version for this budget cycle' : undefined}
+                                            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-error/10 text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                                            Delete This Version
+                                        </button>
+                                    </>
+                                )}
                             </Dropdown.Content>
                         </Dropdown>
 
@@ -1712,7 +1721,7 @@ export default function Show() {
                                 <span className="material-symbols-outlined text-[18px]">lock</span>
                                 Final &amp; Approved
                             </span>
-                        ) : (
+                        ) : !isViewer && (
                             <>
                                 <button
                                     onClick={handleLock}
@@ -1843,9 +1852,9 @@ export default function Show() {
                                 columnDefs={columnDefs}
                                 defaultColDef={{
                                     ...defaultColDef,
-                                    editable: isLatestVersion && !isFinal,   // <--- globally disable editing
+                                    editable: isLatestVersion && !isFinal && !isViewer,   // <--- globally disable editing
                                 }}
-                                suppressClickEdit={!(isLatestVersion && !isFinal)}  // <--- prevent entering edit mode
+                                suppressClickEdit={!(isLatestVersion && !isFinal && !isViewer)}  // <--- prevent entering edit mode
                                 // pagination={true}
                                 // paginationPageSize={20}
                                 onCellValueChanged={onCellValueChanged}
@@ -1865,7 +1874,7 @@ export default function Show() {
                 </div>
             </div>
 
-            {isLatestVersion && !isFinal && (
+            {isLatestVersion && !isFinal && !isViewer && (
                 <button
                     onClick={handleAddNewRow}
                     title="Add new budget row"

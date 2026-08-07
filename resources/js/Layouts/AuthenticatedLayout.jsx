@@ -4,7 +4,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { InertiaProgress } from '@inertiajs/progress';
 import { useState } from 'react';
 
-const navItems = [
+const baseNavItems = [
     { label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
     { label: 'Budgets', icon: 'account_balance_wallet', href: '/budgets' },
     { label: 'Reports', icon: 'analytics' },
@@ -31,6 +31,10 @@ export default function AuthenticatedLayout({ header, children }) {
     const user = auth.user;
     const currentPath = usePage().url;
     const [collapsed, setCollapsed] = useState(true);
+    const isViewer = user.role === 'viewer';
+    const navItems = user.role === 'editor'
+        ? [...baseNavItems, { label: 'Users', icon: 'group', href: '/users' }, { label: 'Activity Log', icon: 'history', href: '/activity-logs' }]
+        : baseNavItems;
 
     return (
         <div className="min-h-screen bg-background text-on-surface font-sans">
@@ -96,14 +100,16 @@ export default function AuthenticatedLayout({ header, children }) {
                     })}
                 </nav>
                 <div className="px-4 mt-auto space-y-2">
-                    <Link
-                        href="/budgets"
-                        title={collapsed ? 'Create New Budget Cycle' : undefined}
-                        className={`w-full flex items-center justify-center gap-2 py-3 bg-primary text-on-primary font-bold rounded-lg shadow-md hover:brightness-110 transition-all text-xs uppercase tracking-wider mb-4`}
-                    >
-                        <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                        {!collapsed && 'Create New Budget Cycle'}
-                    </Link>
+                    {!isViewer && (
+                        <Link
+                            href="/budgets"
+                            title={collapsed ? 'Create New Budget Cycle' : undefined}
+                            className={`w-full flex items-center justify-center gap-2 py-3 bg-primary text-on-primary font-bold rounded-lg shadow-md hover:brightness-110 transition-all text-xs uppercase tracking-wider mb-4`}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                            {!collapsed && 'Create New Budget Cycle'}
+                        </Link>
+                    )}
                     <Link
                         href={route('profile.edit')}
                         title={collapsed ? 'Help Center' : undefined}
@@ -141,7 +147,14 @@ export default function AuthenticatedLayout({ header, children }) {
                             <Dropdown.Trigger>
                                 <div className="flex items-center gap-3 pl-4 border-l border-outline-variant cursor-pointer">
                                     <div className="text-right">
-                                        <p className="font-label-caps text-label-caps text-on-surface leading-none mb-1">{user.name}</p>
+                                        <div className="flex items-center justify-end gap-2 mb-1">
+                                            <p className="font-label-caps text-label-caps text-on-surface leading-none">{user.name}</p>
+                                            {isViewer && (
+                                                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                                                    Viewer
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="font-body-sm text-[10px] text-outline uppercase tracking-widest">{user.email}</p>
                                     </div>
                                     <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center border-2 border-white shadow-sm text-on-primary-container font-bold text-sm">

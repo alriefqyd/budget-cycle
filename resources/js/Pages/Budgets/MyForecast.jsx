@@ -12,7 +12,8 @@ const formatCurrency = (value) => {
 };
 
 export default function MyForecast() {
-    const { budgets, year, budgetVersion, versions } = usePage().props;
+    const { budgets, year, budgetVersion, versions, auth } = usePage().props;
+    const isViewer = auth.user.role === 'viewer';
     const startYear = parseInt(year);
     const endYear = startYear + 4;
     const yearlyBudget = startYear + 2;
@@ -26,7 +27,7 @@ export default function MyForecast() {
     // This page always loads the latest version server-side (getBudgetsByYear
     // with no explicit version falls back to latest), so the only lock
     // condition that applies here is "final & approved".
-    const editable = !isFinal;
+    const editable = !isFinal && !isViewer;
 
     const pmList = useMemo(() => {
         const names = new Set(rows.map((r) => r.project_manager).filter(Boolean));

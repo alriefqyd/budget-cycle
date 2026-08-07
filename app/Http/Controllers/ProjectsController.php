@@ -9,6 +9,7 @@ use App\Exports\BudgetCyclePlanExport;
 use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
+use App\Models\ActivityLog;
 use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
@@ -110,6 +111,7 @@ class ProjectsController extends Controller
             $projectService = new ProjectsService();
             $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
             $data = $projectService->saveProject($request, $budgetCycle);
+            ActivityLog::record('project.created', "Created project \"{$data->project_title}\" ({$data->sap_code}) for {$data->year_period}", $data);
 
             DB::commit();
             /** Websocket */
@@ -145,6 +147,7 @@ class ProjectsController extends Controller
                 $projectList->push($project);
                 $budgetSetting = $projectService->saveBudget($project, $data);
                 $cashCostYearly = $projectService->saveCashCostYearly($project, $data);
+                ActivityLog::record('project.duplicated', "Duplicated project \"{$project->project_title}\" ({$project->sap_code}) for {$project->year_period}", $project);
                 broadcast(new BudgetUpdated($project->toArray()));
                 broadcast(new BudgetListUpdated($currentProject->toArray()));
             }
@@ -182,6 +185,7 @@ class ProjectsController extends Controller
             try {
                 $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
                 Excel::import(new ProjectsImport($request->year, false, $budgetCycle->id), $file);
+                ActivityLog::record('project.imported', "Imported budget file \"{$file->getClientOriginalName()}\" for {$request->year}", $budgetCycle);
                 Log::info('Import project successful');
                 return response()->json(['message' => 'Import Successful']);
             } catch (\Exception $e) {
@@ -258,6 +262,13 @@ class ProjectsController extends Controller
             $projectService->updateBudgetList($request->year);
             $projectService->updateChart($request->year);
 
+            ActivityLog::record(
+                'project.imported',
+                "Imported budget file \"{$file->getClientOriginalName()}\" into {$request->year} v{$request->version} — "
+                    . count($importedSapCodes) . " row(s) updated, {$deletedCount} project(s) removed",
+                $budgetPeriod
+            );
+
             Log::info('Import project successful');
             return response()->json([
                 'message' => "Import successful. {$deletedCount} project(s) not in the file were deleted from this version.",
@@ -280,6 +291,7 @@ class ProjectsController extends Controller
                 'start_year' => $request->year,
                 'budget_cycle_period_id' => $budgetCyclePeriod->id,
             ]);
+            ActivityLog::record('project.created', "Added a new blank project row for {$request->year}", $data);
             $projectService->updateBudgetList($request->year);
             return response()->json(['message' => 'Save Successful']);
         } catch (\Exception $e) {
@@ -331,6 +343,14 @@ class ProjectsController extends Controller
                     'project_id' => $request->id,
                     'cash_remaining' => $request->cash_remaining,
                 ]);
+            }
+
+            $changedFields = array_keys(array_diff_key($project->getChanges(), array_flip(self::$unloggedFields)));
+            if ($budgetOriginal) {
+                $changedFields = array_merge($changedFields, array_keys(array_diff_key($budget->getChanges(), array_flip(self::$unloggedFields))));
+            }
+            if ($changedFields) {
+                ActivityLog::record('project.updated', "Updated project \"{$project->project_title}\" ({$project->sap_code}): " . implode(', ', $changedFields), $project);
             }
 
             $this->logProjectChanges($project, $projectOriginal, $project->getChanges());
@@ -432,6 +452,7 @@ class ProjectsController extends Controller
         }
 
         foreach ($projects as $project) {
+            ActivityLog::record('project.deleted', "Deleted project \"{$project->project_title}\" ({$project->sap_code}) from {$project->year_period}", $project);
             $project->budgets()->delete();
             $project->cashCostYearlies()->delete();
             $project->delete();
@@ -463,6 +484,7 @@ class ProjectsController extends Controller
             $projectService = new ProjectsService();
             $projectService->duplicateDataFinalize($budgetPeriod->id);
             $projectService->updateBudgetList($year);
+            ActivityLog::record('budget.finalized', "Finalized budget cycle {$year} v{$version}", $budgetPeriod);
             return response()->json(['message' => 'Budgets finalize.','status' => 200]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);
@@ -486,6 +508,7 @@ class ProjectsController extends Controller
 
             $projectService = new ProjectsService();
             $projectService->updateBudgetList($year);
+            ActivityLog::record('budget.locked', "Locked and approved budget cycle {$year} v{$version}", $budgetPeriod);
             return response()->json(['message' => 'Budget cycle locked and approved.', 'status' => 200]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);
@@ -582,8 +605,9 @@ class ProjectsController extends Controller
                 return response()->json(['message' => 'Cannot delete the only version of this budget cycle.'], 423);
             }
 
-            DB::transaction(function () use ($budgetPeriod) {
+            DB::transaction(function () use ($budgetPeriod, $year, $version) {
                 $projects = $budgetPeriod->projects()->with(['cashCostYearlies.cashCostMonthly'])->get();
+                ActivityLog::record('budget.version_deleted', "Deleted budget cycle {$year} v{$version} ({$projects->count()} project(s))", $budgetPeriod);
                 foreach ($projects as $project) {
                     foreach ($project->cashCostYearlies as $yearly) {
                         $yearly->cashCostMonthly()->delete();

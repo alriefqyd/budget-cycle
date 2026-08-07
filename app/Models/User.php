@@ -21,7 +21,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
     ];
+
+    public function isViewer(): bool
+    {
+        return $this->role === 'viewer';
+    }
 
     /**
      * The attributes that should be hidden for serialization.
