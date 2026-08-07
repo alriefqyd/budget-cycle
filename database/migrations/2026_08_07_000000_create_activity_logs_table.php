@@ -15,7 +15,12 @@ return new class extends Migration
             $table->string('subject_type')->nullable();
             $table->unsignedBigInteger('subject_id')->nullable();
             $table->string('description');
-            $table->json('properties')->nullable();
+            // text, not json: some deployed MySQL instances still default new
+            // InnoDB tables to ROW_FORMAT=REDUNDANT/COMPACT, and a native JSON
+            // column on that row format fails with "Got error 168 from
+            // storage engine". Eloquent's array cast (see ActivityLog model)
+            // (de)serializes JSON in PHP regardless of the column's SQL type.
+            $table->text('properties')->nullable();
             $table->timestamps();
 
             $table->index(['subject_type', 'subject_id']);
