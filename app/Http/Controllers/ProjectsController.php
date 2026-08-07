@@ -178,7 +178,6 @@ class ProjectsController extends Controller
         ini_set('memory_limit', '512M');
 
         $projectService = new ProjectsService();
-        $data = $projectService->getDataProjectIndex();
         $file = $request->file('file');
         if ($request->hasFile('file')) {
             Log::info('Starting import projects...');
@@ -186,6 +185,8 @@ class ProjectsController extends Controller
                 $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
                 Excel::import(new ProjectsImport($request->year, false, $budgetCycle->id), $file);
                 ActivityLog::record('project.imported', "Imported budget file \"{$file->getClientOriginalName()}\" for {$request->year}", $budgetCycle);
+                $projectService->updateBudgetList($request->year);
+                $projectService->updateChart($request->year);
                 Log::info('Import project successful');
                 return response()->json(['message' => 'Import Successful']);
             } catch (\Exception $e) {

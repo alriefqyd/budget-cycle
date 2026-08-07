@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Columns3 } from "lucide-react";
 import Dropdown from "@/Components/Dropdown.jsx";
 
@@ -7,7 +7,7 @@ import Dropdown from "@/Components/Dropdown.jsx";
 // also control them would fight with that tab logic and confuse the "N
 // hidden" count with columns that are only hidden because of the tab, not a
 // deliberate user choice. Only the tab-independent columns are listed here.
-const TAB_CONTROLLED_FIELD = /^(total_)?(cost|cash)_\d+(_\d+)?(_remaining)?$/;
+export const TAB_CONTROLLED_FIELD = /^(total_)?(cost|cash)_\d+(_\d+)?(_remaining)?$/;
 
 // Flattens columnDefs (which nests year/actual/forecast columns under
 // group headers via `children`) into a single list of {field, label} for
@@ -58,13 +58,23 @@ export default function ColumnVisibilityPanel({ api, columnDefs }) {
         api.setColumnsVisible([field], hiddenFields.has(field));
     };
 
-    const showAll = (e) => {
-        e.stopPropagation();
-        api.setColumnsVisible(allColumns.map(c => c.field), true);
-    };
-
     const visible = allColumns.filter(c => c.label.toLowerCase().includes(search.toLowerCase()));
     const hiddenCount = allColumns.filter(c => hiddenFields.has(c.field)).length;
+
+    // Master checkbox: checked when every column is visible, unchecked when
+    // every column is hidden, indeterminate for anything in between — same
+    // three-state convention as a table's "select all" header checkbox.
+    const allSelected = hiddenCount === 0;
+    const noneSelected = hiddenCount === allColumns.length && allColumns.length > 0;
+    const selectAllRef = useRef(null);
+    useEffect(() => {
+        if (selectAllRef.current) selectAllRef.current.indeterminate = !allSelected && !noneSelected;
+    }, [allSelected, noneSelected]);
+
+    const toggleSelectAll = (e) => {
+        e.stopPropagation();
+        api.setColumnsVisible(allColumns.map(c => c.field), !allSelected);
+    };
 
     return (
         <Dropdown>
@@ -84,6 +94,15 @@ export default function ColumnVisibilityPanel({ api, columnDefs }) {
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full px-2 py-1.5 mb-2 border border-outline-variant rounded-lg text-sm focus:ring-1 focus:ring-primary outline-none"
                     />
+                    <label className="flex items-center gap-2 px-1 py-1.5 mb-1 border-b border-outline-variant font-bold cursor-pointer text-sm">
+                        <input
+                            ref={selectAllRef}
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={toggleSelectAll}
+                        />
+                        Pilih Semua
+                    </label>
                     <div className="max-h-72 overflow-y-auto">
                         {visible.map(col => {
                             const isHidden = hiddenFields.has(col.field);
@@ -103,14 +122,6 @@ export default function ColumnVisibilityPanel({ api, columnDefs }) {
                             <p className="text-on-surface-variant text-sm px-1 py-2">Tidak ada hasil.</p>
                         )}
                     </div>
-                    {hiddenCount > 0 && (
-                        <button
-                            onClick={showAll}
-                            className="w-full mt-2 pt-2 border-t border-outline-variant text-xs text-primary hover:underline text-left"
-                        >
-                            Tampilkan semua kolom ({hiddenCount} tersembunyi)
-                        </button>
-                    )}
                 </div>
             </Dropdown.Content>
         </Dropdown>

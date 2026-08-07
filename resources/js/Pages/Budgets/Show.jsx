@@ -39,7 +39,7 @@ import Modal from "@/Components/Modal.jsx";
 import ProjectTrendChart from "@/Components/ProjectTrendChart.jsx";
 import PinnableHeader from "@/Components/Budgets/PinnableHeader.jsx";
 import ForecastsDashboard from "@/Components/Budgets/ForecastsDashboard.jsx";
-import ColumnVisibilityPanel from "@/Components/Budgets/ColumnVisibilityPanel.jsx";
+import ColumnVisibilityPanel, { TAB_CONTROLLED_FIELD } from "@/Components/Budgets/ColumnVisibilityPanel.jsx";
 
 
 ModuleRegistry.registerModules([
@@ -200,6 +200,26 @@ export default function Show() {
     const [historyProject, setHistoryProject] = useState(null);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+    const saveStatusTimeout = useRef(null);
+
+    // Source of truth for user-hidden columns. columnDefs below is rebuilt
+    // fresh on every render (rowData updates, tab switches, cell edits...),
+    // and AG Grid re-applies each colDef's `hide` on every columnDefs prop
+    // change — so a column hidden only via a live api.setColumnsVisible()
+    // call (as the old code did) would silently reappear on the very next
+    // unrelated re-render, not just on a full page refresh. Keeping the
+    // hidden set in React state and baking it into columnDefs itself (see
+    // applyPersistedHide below) makes the hide durable across re-renders,
+    // matching how the tab-controlled columns already derive `hide` from
+    // React state instead of one-off imperative calls.
+    const [hiddenColumnsPref, setHiddenColumnsPref] = useState(() => {
+        try {
+            return new Set(JSON.parse(localStorage.getItem('budgetGrid.hiddenColumns') || '[]'));
+        } catch (e) {
+            return new Set();
+        }
+    });
 
     const openHistory = async (project) => {
         setHistoryProject(project);
@@ -298,9 +318,9 @@ export default function Show() {
 
     const generateTwoYearYearly = (year,type) => {
         month.forEach((month,index) => {
-            let color = 'custom-header-blue'
+            let color = 'custom-header-green'
             if(type == 'cash') {
-                color = 'custom-header-gray'
+                color = 'custom-header-orange'
             }
             const monthField = `${type}_${index+1}_${year}`;
             columnDefs.push({
@@ -506,7 +526,7 @@ export default function Show() {
                     filter: ExcelStyleFilter,
                     filterParams: { values: rowData.map(r => r[`total_cost_${year}`]) },
                     minWidth: 170,
-                    headerClass: 'custom-header-red',
+                    headerClass: 'custom-header-green',
                     editable:false,
                     enableCellChangeFlash: false,
                     hide: !isTab2,
@@ -525,7 +545,7 @@ export default function Show() {
             minWidth: 150,
             hide: hide,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-orange',
+            headerClass:'custom-header-green',
             valueFormatter: params => formatCurrency(params.value)
         }
         );
@@ -559,7 +579,7 @@ export default function Show() {
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-orange',
+            headerClass:'custom-header-green',
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value)
         },
@@ -570,7 +590,7 @@ export default function Show() {
             filterParams: { values: rowData.map(r => r.cost_remaining) },
             minWidth: 150,
             editable: false,
-            headerClass:'custom-header-orange',
+            headerClass:'custom-header-green',
             enableCellChangeFlash: false,
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value),
@@ -590,7 +610,7 @@ export default function Show() {
                     filter: ExcelStyleFilter,
                     filterParams: { values: rowData.map(r => r[`total_cash_${year}`]) },
                     minWidth: 170,
-                    headerClass: 'custom-header-red',
+                    headerClass: 'custom-header-orange',
                     editable:false,
                     enableCellChangeFlash: false,
                     hide: !isTab2,
@@ -606,7 +626,7 @@ export default function Show() {
             filterParams: { values: rowData.map(r => r[`cash_${year}`]) },
             minWidth: 150,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-green',
+            headerClass:'custom-header-orange',
             valueFormatter: params => formatCurrency(params.value),
             hide: hide,
         });
@@ -621,7 +641,7 @@ export default function Show() {
                     minWidth: 220,
                     enableCellChangeFlash: false,
                     hide: !isTab2,
-                    headerClass:'custom-header-green',
+                    headerClass:'custom-header-orange-2',
                     valueFormatter: params => formatCurrency(params.value),
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
@@ -641,7 +661,7 @@ export default function Show() {
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-green',
+            headerClass:'custom-header-orange',
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value)
         },
@@ -653,7 +673,7 @@ export default function Show() {
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-green',
+            headerClass:'custom-header-orange',
             hide: activeTab === 'Tab1' ? false : true,
             valueFormatter: params => formatCurrency(params.value),
             cellClassRules: {
@@ -663,6 +683,23 @@ export default function Show() {
         }
     )
 
+    // Bakes the persisted hide preference into columnDefs itself (see
+    // hiddenColumnsPref above) rather than relying on a one-off imperative
+    // api.setColumnsVisible() call, so it survives every re-render, not just
+    // the initial mount. Tab-controlled columns are left untouched — their
+    // `hide` already correctly comes from activeTab above.
+    const applyPersistedHide = (defs) => {
+        defs.forEach(def => {
+            if (Array.isArray(def.children)) {
+                applyPersistedHide(def.children);
+            } else if (def.field && !TAB_CONTROLLED_FIELD.test(def.field) && hiddenColumnsPref.has(def.field)) {
+                def.hide = true;
+            }
+        });
+        return defs;
+    };
+    applyPersistedHide(columnDefs);
+
     const defaultColDef = {
         resizable: true,
         sortable: true,
@@ -671,6 +708,8 @@ export default function Show() {
         minWidth: 120,
         editable: true,
         headerComponent: PinnableHeader,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
     }
     const formatCurrency = (value) => {
         if (value == null || isNaN(value)) return '';
@@ -1257,6 +1296,8 @@ export default function Show() {
             }
         }
 
+        clearTimeout(saveStatusTimeout.current);
+        setSaveStatus('saving');
         try {
             const isNew = !data.id; // if no ID, it's new
             data['year_period'] = startYear
@@ -1276,6 +1317,8 @@ export default function Show() {
             if (!result.success) {
                 console.error("Failed to update budget record:", result);
                 alert(result.message || "An error occurred while updating the data. Please try again.");
+                setSaveStatus('error');
+                return;
             }
 
             if (isNew && result.data?.id) {
@@ -1289,8 +1332,11 @@ export default function Show() {
 
             console.log(result.message);
             recomputeKpiTotals();
+            setSaveStatus('saved');
+            saveStatusTimeout.current = setTimeout(() => setSaveStatus('idle'), 2500);
         } catch (error) {
             console.error("Update error:", error);
+            setSaveStatus('error');
         }
     };
 
@@ -1572,6 +1618,46 @@ export default function Show() {
 
     const agGridRef = useRef(); // <--- Add this
 
+    // Filters are also meant to feel "permanent" across refreshes, mirrored
+    // to localStorage. Unlike column hide (baked into columnDefs above), the
+    // filter model isn't a colDef property — AG Grid keeps it in its own
+    // FilterManager state, which does survive columnDefs re-renders on its
+    // own, so a plain restore-on-ready + persist-on-change is sufficient here.
+    const FILTER_MODEL_STORAGE_KEY = 'budgetGrid.filterModel';
+
+    const onGridReady = (params) => {
+        try {
+            const savedFilterModel = JSON.parse(localStorage.getItem(FILTER_MODEL_STORAGE_KEY) || 'null');
+            if (savedFilterModel) params.api.setFilterModel(savedFilterModel);
+        } catch (e) {
+            console.error('Failed to restore saved filter model:', e);
+        }
+    };
+
+    // Fired for ANY visibility change (the header's own hide button, the
+    // Columns panel checkboxes, or its Select All) — single choke point that
+    // syncs the live grid state back into hiddenColumnsPref + localStorage.
+    const onColumnVisibleForStorage = () => {
+        const api = agGridRef.current?.api;
+        if (!api) return;
+        const hidden = new Set();
+        api.getColumns()?.forEach(col => {
+            const field = col.getColId();
+            if (!col.isVisible() && !TAB_CONTROLLED_FIELD.test(field)) hidden.add(field);
+        });
+        localStorage.setItem('budgetGrid.hiddenColumns', JSON.stringify([...hidden]));
+        setHiddenColumnsPref(hidden);
+    };
+
+    const onFilterChangedCombined = (params) => {
+        recomputeKpiTotals();
+        try {
+            localStorage.setItem(FILTER_MODEL_STORAGE_KEY, JSON.stringify(params.api.getFilterModel()));
+        } catch (e) {
+            console.error('Failed to persist filter model:', e);
+        }
+    };
+
     return (
         <AuthenticatedLayout>
             <div className="flex flex-col gap-stack-md">
@@ -1592,6 +1678,33 @@ export default function Show() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md">
                     <div className="flex items-center gap-stack-md flex-wrap">
                         <h2 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">Budget Overview</h2>
+
+                        {saveStatus !== 'idle' && (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                                saveStatus === 'saving' ? 'bg-surface-container-high text-on-surface-variant' :
+                                saveStatus === 'saved' ? 'bg-tertiary-container/20 text-tertiary' :
+                                'bg-error-container text-error'
+                            }`}>
+                                {saveStatus === 'saving' && (
+                                    <>
+                                        <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                                        Saving…
+                                    </>
+                                )}
+                                {saveStatus === 'saved' && (
+                                    <>
+                                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                        Saved
+                                    </>
+                                )}
+                                {saveStatus === 'error' && (
+                                    <>
+                                        <span className="material-symbols-outlined text-[14px]">error</span>
+                                        Save failed
+                                    </>
+                                )}
+                            </span>
+                        )}
 
                         {/* Version control — clean select pill; Compare is a normal secondary
                             button beside it. Delete Version (destructive, rare) moved into the
@@ -1806,7 +1919,7 @@ export default function Show() {
                             {[
                                 { key: 'Tab1', label: 'Budget 5 Years' },
                                 { key: 'Tab2', label: 'Year To Date' },
-                                { key: 'Tab3', label: 'Forecasts' },
+                                ...(isViewer ? [] : [{ key: 'Tab3', label: 'Forecasts' }]),
                             ].map((tab) => (
                                 <button
                                     key={tab.key}
@@ -1865,7 +1978,9 @@ export default function Show() {
                                 onSelectionChanged={onSelectionChanged}
                                 getRowId={params => params.data.id}
                                 pinnedTopRowData={calculateTotals(rowData)}
-                                onFilterChanged={recomputeKpiTotals}
+                                onGridReady={onGridReady}
+                                onColumnVisible={onColumnVisibleForStorage}
+                                onFilterChanged={onFilterChangedCombined}
                                 onFirstDataRendered={recomputeKpiTotals}
                                 onRowDataUpdated={recomputeKpiTotals}
                             />

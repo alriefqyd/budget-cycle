@@ -84,20 +84,14 @@
     height: auto !important;
 }
 
-/* Column group families (Cost / Cash / Total / monthly detail) — previously
-   each family got its own saturated fill (gold/teal/dark navy/etc.), a rainbow
-   across 50+ columns. Simplified to one neutral header everywhere; the only
-   two colored things left in the whole grid are the status pill and the
-   negative/positive cell highlight, both of which carry real information
-   rather than just decorating column groups. Grand-total columns keep a
-   slightly heavier weight so they still stand out, just via typography. */
-.custom-header-orange,
-.custom-header-orange-2,
+/* Column group families (Cost / Cash / Total / monthly detail). Cost and
+   Cash now get a deliberate, theme-consistent color pairing so the two
+   money flows are distinguishable at a glance across all ~50 year/month
+   columns: Cost = light green (the same tertiary-family swatch already
+   used for .positive-value), Cash = light orange/amber, its complement. */
 .custom-header-gray,
-.custom-header-blue,
-.custom-header-green,
-.custom-header-green-2 {
-    background-color: #dce9ff; /* same as the base header — surface-container-high */
+.custom-header-blue {
+    background-color: #dce9ff; /* same as the base header — surface-container-high; now unused but left neutral */
 }
 
 .custom-header-red {
@@ -105,6 +99,24 @@
 }
 .custom-header-red .ag-header-cell-label {
     font-weight: 800;
+}
+
+.custom-header-green,
+.custom-header-green-2 {
+    background-color: #d7f7ea; /* light tertiary — same swatch as .positive-value; Cost columns */
+}
+.custom-header-green .ag-header-cell-label,
+.custom-header-green-2 .ag-header-cell-label {
+    color: #005236; /* on-tertiary-fixed-variant */
+}
+
+.custom-header-orange,
+.custom-header-orange-2 {
+    background-color: #ffe3c2; /* light amber, Cash columns' complement to Cost's green */
+}
+.custom-header-orange .ag-header-cell-label,
+.custom-header-orange-2 .ag-header-cell-label {
+    color: #7a4100;
 }
 
 /* Cells */
