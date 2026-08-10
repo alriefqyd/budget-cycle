@@ -7,6 +7,16 @@ export default function RowTable(props) {
     const currency = (value) =>
         `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+    const compactCurrency = (value) =>
+        `$${new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0))}`;
+
+    const years = Array.from(
+        new Set(item.costCashYearlies.map(({ year }) => year))
+    ).sort((a, b) => a - b);
+
+    const amountFor = (year, type) =>
+        item.costCashYearlies.find((row) => row.year === year && row.type === type)?.amount ?? 0;
+
     return (
         <tr
             onClick={() => router.visit(url)}
@@ -31,32 +41,51 @@ export default function RowTable(props) {
                 </span>
             </td>
             <td className="px-6 py-5">
-                <div className="flex flex-col gap-2 items-center">
-                    <div className="flex flex-wrap gap-1 justify-center">
-                        {item.costCashYearlies
-                            .filter(({ type }) => type === 'cash')
-                            .map(({ year, amount }) => (
-                                <span
+                <table className="mx-auto border-collapse font-data-tabular text-data-tabular">
+                    <thead>
+                        <tr>
+                            <th className="px-2 py-0.5 text-[10px]" />
+                            {years.map((year) => (
+                                <th
+                                    key={year}
+                                    className="px-2 py-0.5 text-[10px] font-label-caps text-on-surface-variant text-right"
+                                >
+                                    {year}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td className="px-2 py-0.5 text-[10px] font-label-caps text-[#006545] text-left whitespace-nowrap">
+                                Cash
+                            </td>
+                            {years.map((year) => (
+                                <td
                                     key={`cash-${year}`}
-                                    className="text-[10px] font-label-caps bg-tertiary-container/10 text-tertiary-container px-2 py-0.5 rounded"
+                                    title={currency(amountFor(year, 'cash'))}
+                                    className="px-2 py-0.5 text-[11px] text-right text-on-surface tabular-nums whitespace-nowrap"
                                 >
-                                    {year}: {currency(amount)}
-                                </span>
+                                    {compactCurrency(amountFor(year, 'cash'))}
+                                </td>
                             ))}
-                    </div>
-                    <div className="flex flex-wrap gap-1 justify-center">
-                        {item.costCashYearlies
-                            .filter(({ type }) => type === 'cost')
-                            .map(({ year, amount }) => (
-                                <span
+                        </tr>
+                        <tr className="border-t border-outline-variant/30">
+                            <td className="px-2 py-0.5 text-[10px] font-label-caps text-[#005c99] text-left whitespace-nowrap">
+                                Cost
+                            </td>
+                            {years.map((year) => (
+                                <td
                                     key={`cost-${year}`}
-                                    className="text-[10px] font-label-caps bg-primary-container/10 text-primary px-2 py-0.5 rounded"
+                                    title={currency(amountFor(year, 'cost'))}
+                                    className="px-2 py-0.5 text-[11px] text-right text-on-surface tabular-nums whitespace-nowrap"
                                 >
-                                    {year}: {currency(amount)}
-                                </span>
+                                    {compactCurrency(amountFor(year, 'cost'))}
+                                </td>
                             ))}
-                    </div>
-                </div>
+                        </tr>
+                    </tbody>
+                </table>
             </td>
         </tr>
     )
