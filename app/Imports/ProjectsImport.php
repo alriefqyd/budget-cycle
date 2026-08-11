@@ -34,6 +34,8 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
     use RegistersEventListeners;
 
     private $uniqueIdentifiers = [];
+    private $processedCount = 0;
+    private $rejectedSapCodes = [];
     public function __construct($year, $isBudgetCycle, $budgetCyclePeriodId){
         $this->year = $year;
         $this->isBudgetCycle = $isBudgetCycle;
@@ -59,9 +61,22 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         return array_values(array_unique(array_filter($this->uniqueIdentifiers, fn ($code) => $code !== null)));
     }
 
+    // Distinct from getImportedSapCodes(): that method records every SAP code
+    // *seen* in the file (used to protect rows from stale-deletion), even ones
+    // that failed the format check below and were never actually persisted.
+    // This is the true "did anything happen" signal — callers should treat a
+    // non-empty file with zero processed rows as a failure, not a silent success.
+    public function getProcessedCount(): int{
+        return $this->processedCount;
+    }
+
+    public function getRejectedSapCodes(): array{
+        return array_values(array_unique($this->rejectedSapCodes));
+    }
+
     public function map($row): array{
         return [
-            'sap_code' => $row[1] ?? null,
+            'sap_code' => isset($row[1]) ? trim($row[1]) : null,
             'project_title' => $row[2] ?? "",
             'note' => $row[3] ?? "",
             'status_progress' => $row[4] ?? "",
@@ -128,6 +143,7 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         // Mark SAP code as imported
         $this->uniqueIdentifiers[] = $row['sap_code'];
         if ($row['sap_code'] !== null && preg_match('/^C[0-9]/', $row['sap_code'])) {
+            $this->processedCount++;
             if ($this->isBudgetCycle) {
                 // Check if existing project within this budget cycle version
                 $project = Projects::firstOrNew([
@@ -258,6 +274,11 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             if($this->isBudgetCycle){
                 $projectService->updateBudgets($this->year, $project->id);
             }
+        } elseif ($row['sap_code'] !== null) {
+            // Seen but didn't match the expected SAP code format (e.g. must
+            // start with "C" followed by a digit) — recorded so callers can
+            // tell "file had rows but none were valid" apart from "empty file".
+            $this->rejectedSapCodes[] = $row['sap_code'];
         }
     }
 

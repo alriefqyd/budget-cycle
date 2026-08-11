@@ -190,7 +190,19 @@ class ProjectsController extends Controller
             Log::info('Starting import projects...');
             try {
                 $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
-                Excel::import(new ProjectsImport($request->year, false, $budgetCycle->id), $file);
+                $importClass = new ProjectsImport($request->year, false, $budgetCycle->id);
+                Excel::import($importClass, $file);
+
+                if ($importClass->getProcessedCount() === 0) {
+                    $rejected = $importClass->getRejectedSapCodes();
+                    $budgetCycle->delete();
+                    return response()->json([
+                        'message' => $rejected
+                            ? 'No valid rows found in file. SAP codes must start with "C" followed by a digit — found: ' . implode(', ', array_slice($rejected, 0, 10))
+                            : 'No valid rows found in file. The file may be empty or missing a SAP Code column.',
+                    ], 422);
+                }
+
                 ActivityLog::record('project.imported', "Imported budget file \"{$file->getClientOriginalName()}\" for {$request->year}", $budgetCycle);
                 $projectService->updateBudgetList($request->year);
                 $projectService->updateChart($request->year);
@@ -252,8 +264,12 @@ class ProjectsController extends Controller
             Excel::import($importClass, $file);
 
             $importedSapCodes = $importClass->getImportedSapCodes();
-            if (empty($importedSapCodes)) {
-                return response()->json(['message' => 'No valid rows found in file. Aborted to avoid deleting all projects in this version.'], 422);
+            if ($importClass->getProcessedCount() === 0) {
+                $rejected = $importClass->getRejectedSapCodes();
+                $message = $rejected
+                    ? 'No valid rows found in file. Aborted to avoid deleting all projects in this version. SAP codes must start with "C" followed by a digit — found: ' . implode(', ', array_slice($rejected, 0, 10))
+                    : 'No valid rows found in file. Aborted to avoid deleting all projects in this version.';
+                return response()->json(['message' => $message], 422);
             }
 
             $staleProjects = Projects::where('budget_cycle_period_id', $budgetPeriod->id)
