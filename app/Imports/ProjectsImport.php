@@ -36,10 +36,12 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
     private $uniqueIdentifiers = [];
     private $processedCount = 0;
     private $rejectedSapCodes = [];
-    public function __construct($year, $isBudgetCycle, $budgetCyclePeriodId){
+    private $isDryRun = false;
+    public function __construct($year, $isBudgetCycle, $budgetCyclePeriodId, $isDryRun = false){
         $this->year = $year;
         $this->isBudgetCycle = $isBudgetCycle;
         $this->budgetCyclePeriodId = $budgetCyclePeriodId;
+        $this->isDryRun = $isDryRun;
     }
     public function batchSize(): int{
         return 1000;
@@ -114,9 +116,12 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             'cash_total' => $row[35] ?? "",
             // Commitment only covers two years — the year before the cycle
             // starts and the cycle's start year itself (matches the Show.jsx
-            // grid's commitment window).
-            'commitment_previous_year' => $row[36] ?? "",
-            'commitment_current_year' => $row[37] ?? "",
+            // grid's commitment window). Kept at the very last two columns
+            // (matching export_budget.blade.php) rather than right after
+            // cash_total, so its position doesn't shift if columns in between
+            // ever change.
+            'commitment_previous_year' => $row[88] ?? "",
+            'commitment_current_year' => $row[89] ?? "",
         ];
     }
 
@@ -144,49 +149,32 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         $this->uniqueIdentifiers[] = $row['sap_code'];
         if ($row['sap_code'] !== null && preg_match('/^C[0-9]/', $row['sap_code'])) {
             $this->processedCount++;
-            if ($this->isBudgetCycle) {
-                // Check if existing project within this budget cycle version
-                $project = Projects::firstOrNew([
-                    'sap_code' => $row['sap_code'],
-                    'budget_cycle_period_id' => $this->budgetCyclePeriodId,
-                ]);
+            // firstOrNew (not create) regardless of isBudgetCycle: a period
+            // can now be an existing/reused row (ProjectsService::saveBudgetCyclePeriod
+            // uses firstOrCreate), so an unconditional create() here would
+            // insert a duplicate project every time the same SAP code is
+            // re-uploaded into the same period instead of updating it.
+            $project = Projects::firstOrNew([
+                'sap_code' => $row['sap_code'],
+                'budget_cycle_period_id' => $this->budgetCyclePeriodId,
+            ]);
 
-                // Fill other updatable fields
-                $project->fill([
-                    'project_title' => $row['project_title'],
-                    'note' => $row['note'],
-                    'status_progress' => $row['status_progress'],
-                    'project_manager' => $row['project_manager'],
-                    'project_control' => $row['project_control'],
-                    'directorate' => $row['directorate'],
-                    'owner_area' => $row['owner_area'],
-                    'type_of_investment' => $row['type_of_investment'],
-                    'category' => $row['category'],
-                    'risk_residual' => $row['risk_residual'],
-                    'risk_forecast' => $row['risk_forecast'],
-                    'fm_new' => $row['fm_new'],
-                    'year_period' => $row['year_period'],
-                ]);
-                $project->save();
-            } else {
-                $project = Projects::create([
-                    'sap_code' => $row['sap_code'],
-                    'project_title' => $row['project_title'],
-                    'note' => $row['note'],
-                    'status_progress' => $row['status_progress'],
-                    'project_manager' => $row['project_manager'],
-                    'project_control' => $row['project_control'],
-                    'directorate' => $row['directorate'],
-                    'owner_area' => $row['owner_area'],
-                    'type_of_investment' => $row['type_of_investment'],
-                    'category' => $row['category'],
-                    'risk_residual' => $row['risk_residual'],
-                    'risk_forecast' => $row['risk_forecast'],
-                    'fm_new' => $row['fm_new'],
-                    'year_period' => $row['year_period'],
-                    'budget_cycle_period_id' => $this->budgetCyclePeriodId
-                ]);
-            }
+            $project->fill([
+                'project_title' => $row['project_title'],
+                'note' => $row['note'],
+                'status_progress' => $row['status_progress'],
+                'project_manager' => $row['project_manager'],
+                'project_control' => $row['project_control'],
+                'directorate' => $row['directorate'],
+                'owner_area' => $row['owner_area'],
+                'type_of_investment' => $row['type_of_investment'],
+                'category' => $row['category'],
+                'risk_residual' => $row['risk_residual'],
+                'risk_forecast' => $row['risk_forecast'],
+                'fm_new' => $row['fm_new'],
+                'year_period' => $row['year_period'],
+            ]);
+            $project->save();
 
             /* CASH LOOP */
             $totalCash = 0;
@@ -283,6 +271,13 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
     }
 
     public static function afterImport(AfterImport $event){
+        $concernable = $event->getConcernable();
+        if ($concernable instanceof self && $concernable->isDryRun) {
+            // Dry-run preview: the caller rolls back the whole DB transaction
+            // right after this fires, so broadcasting now would push
+            // about-to-be-discarded data to every connected client.
+            return;
+        }
         Log::info('AfterImport event fired');
         $projectService = new ProjectsService();
         $data = $projectService->getDataProjectIndex();

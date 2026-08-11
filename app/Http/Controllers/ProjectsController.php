@@ -220,6 +220,9 @@ class ProjectsController extends Controller
     }
 
     public function export(Request $request){
+        if ($request->user()->isViewer()) {
+            abort(403, 'Viewers are not allowed to export data.');
+        }
         try {
             $projectService = new ProjectsService;
             $budgets = $projectService->getBudgetsByYear($request->year, null);
@@ -246,6 +249,8 @@ class ProjectsController extends Controller
         }
 
         Log::info('Starting import projects...');
+        $dryRun = $request->boolean('dry_run');
+        DB::beginTransaction();
         try {
             $budgetPeriod = BudgetCyclePeriod::where('start_year', $request->year)
                 ->where('version', $request->version)
@@ -253,18 +258,21 @@ class ProjectsController extends Controller
 
             $latestVersion = BudgetCyclePeriod::where('start_year', $request->year)->max('version');
             if ((int) $budgetPeriod->version !== (int) $latestVersion) {
+                DB::rollBack();
                 return response()->json(['message' => 'Cannot import into a locked (non-latest) budget cycle version.'], 423);
             }
             if ($budgetPeriod->approval_status === ApprovalStatus::FINAL->value) {
+                DB::rollBack();
                 return response()->json(['message' => 'This budget cycle version is locked and can no longer be imported into.'], 423);
             }
 
             $projectService = new ProjectsService;
-            $importClass = new ProjectsImport($request->year, true, $budgetPeriod->id);
+            $importClass = new ProjectsImport($request->year, true, $budgetPeriod->id, $dryRun);
             Excel::import($importClass, $file);
 
             $importedSapCodes = $importClass->getImportedSapCodes();
             if ($importClass->getProcessedCount() === 0) {
+                DB::rollBack();
                 $rejected = $importClass->getRejectedSapCodes();
                 $message = $rejected
                     ? 'No valid rows found in file. Aborted to avoid deleting all projects in this version. SAP codes must start with "C" followed by a digit — found: ' . implode(', ', array_slice($rejected, 0, 10))
@@ -283,6 +291,20 @@ class ProjectsController extends Controller
             }
             $deletedCount = $staleProjects->count();
 
+            // Preview mode: roll back every write above (both the row
+            // updates and the deletions) and just report what *would*
+            // happen, so the frontend can show a real count before the user
+            // confirms a destructive import instead of finding out after.
+            if ($dryRun) {
+                DB::rollBack();
+                return response()->json([
+                    'dry_run' => true,
+                    'updated' => count($importedSapCodes),
+                    'deleted' => $deletedCount,
+                    'deleted_titles' => $staleProjects->pluck('project_title')->filter()->take(10)->values(),
+                ]);
+            }
+
             $projectService->updateBudgetList($request->year);
             $projectService->updateChart($request->year);
 
@@ -293,6 +315,7 @@ class ProjectsController extends Controller
                 $budgetPeriod
             );
 
+            DB::commit();
             Log::info('Import project successful');
             return response()->json([
                 'message' => "Import successful. {$deletedCount} project(s) not in the file were deleted from this version.",
@@ -448,6 +471,18 @@ class ProjectsController extends Controller
                 'message' => 'Budget updated successfully',
                 'data' => true
             ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            DB::rollback();
+            // The project this row pointed to no longer exists — most likely
+            // it was removed by a re-import (which replaces rows with new
+            // IDs) or a bulk delete that happened after this page was
+            // loaded. The raw "No query results for model" message doesn't
+            // tell the user what to actually do about it.
+            return response()->json([
+                'success' => false,
+                'message' => 'This row no longer exists — it may have been removed or replaced by a more recent import. Please refresh the page and try again.',
+                'data' => false
+            ], 404);
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json([

@@ -14,11 +14,11 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import EmptyChartState from '@/Components/EmptyChartState.jsx';
 import { CHART_CHROME, CHART_BODY_HEIGHT } from '@/lib/chartTheme.js';
 
-const CATEGORICAL = [
-    'rgb(255, 99, 132)',
-    'rgb(54, 162, 235)',
-    'rgb(255, 205, 86)',
-];
+// Shared with StackedTrendByDirectorate.jsx so the same category reads the
+// same color everywhere on the dashboard. 8 slots covers the largest known
+// breakdown (the 8 `category` values) without folding most of them into
+// "Other".
+const CATEGORICAL = ['#007e7a', '#e9b733', '#94a3b8', '#8a6100', '#a3231f', '#1E88E5', '#6d28d9', '#059669'];
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, ChartDataLabels);
 
@@ -49,7 +49,7 @@ const centerTotalPlugin = {
 // make two different categories indistinguishable in the legend and ring).
 const MAX_SLICES = CATEGORICAL.length;
 
-export default function PieChartCategory({ dataChart, cols, year }) {
+export default function PieChartCategory({ dataChart, cols, year, title = 'Project Category', noun = 'category' }) {
     const [viewType, setViewType] = useState('count'); // "count" or "budget"
     const hasData = (dataChart ?? []).length > 0;
 
@@ -60,8 +60,11 @@ export default function PieChartCategory({ dataChart, cols, year }) {
     // alphabetical order decides which color slot each one gets, so two
     // categories in the top set never collide on the same color and swapping
     // the view type (or a live data update) doesn't repaint everyone.
+    // Labels come straight from a DB column and aren't guaranteed to be a
+    // string (e.g. a stray "0" value groups/casts to the number 0 server-side) —
+    // coerce before comparing so an unexpected value can't crash the chart.
     const ranked = [...(dataChart ?? [])].sort((a, b) => Number(valueFor(b) || 0) - Number(valueFor(a) || 0));
-    const topItems = ranked.slice(0, MAX_SLICES).sort((a, b) => a.label.localeCompare(b.label));
+    const topItems = ranked.slice(0, MAX_SLICES).sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? '')));
     const otherItems = ranked.slice(MAX_SLICES);
 
     const labels = [...topItems.map((item) => item.label), ...(otherItems.length > 0 ? ['Other'] : [])];
@@ -140,11 +143,11 @@ export default function PieChartCategory({ dataChart, cols, year }) {
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
             <div className="flex justify-between items-center mb-4">
                 <div>
-                    <h3 className="font-title-sm text-title-sm text-on-surface">Project Category</h3>
+                    <h3 className="font-title-sm text-title-sm text-on-surface">{title}</h3>
                     <div className="flex items-center gap-2 mt-1">
                         <span className="w-2 h-2 rounded-full bg-primary"></span>
                         <p className="font-body-sm text-body-sm text-on-surface-variant">
-                            {viewType === 'count' ? 'Projects by category' : 'Budget by category · in million'}
+                            {viewType === 'count' ? `Projects by ${noun}` : `Budget by ${noun} · in million`}
                         </p>
                     </div>
                 </div>

@@ -97,6 +97,12 @@
         <th>Nov-27 Cash</th>
         <th>Dec-27 Cash</th>
         <th>Total 2027 Cash</th>
+
+        <!-- Commitment: kept as the very last two columns, after every other
+             column, so its position stays stable regardless of how many
+             monthly placeholder columns precede it. -->
+        <th>Commitment {{ $year - 1 }} (USD)</th>
+        <th>Commitment {{ $year }} (USD)</th>
     </tr>
     </thead>
     <tbody>
@@ -140,30 +146,16 @@
             <td>{{ $budget['cash_'.($year + 4)] ?? 0 }}</td>
             <td>{{ $budget['total_cash'] ?? 0 }}</td>
 
-            {{-- Placeholder for monthly cost and cash (2025 and 2026) --}}
-            <td>-</td> {{-- Jan-25 --}}
-            <td>-</td> {{-- Feb-25 --}}
-            <td>-</td> {{-- Mar-25 --}}
-            <td>-</td> {{-- Apr-25 --}}
-            <td>-</td> {{-- Total 2025 Cost --}}
+            {{-- Placeholder for the 4 monthly sections above (Cost/Cash x
+            2026/2027, 13 columns each = 52) -- kept as blank "-" cells since
+            this data isn't tracked per-month here. Count must match the
+            header exactly so Commitment below lands in the right column. --}}
+            @for ($i = 0; $i < 52; $i++)
+                <td>-</td>
+            @endfor
 
-            <td>-</td> {{-- Jan-25 Cash --}}
-            <td>-</td> {{-- Feb-25 Cash --}}
-            <td>-</td> {{-- Mar-25 Cash --}}
-            <td>-</td> {{-- Apr-25 Cash --}}
-            <td>-</td> {{-- Total 2025 Cash --}}
-
-            <td>-</td> {{-- Jan-26 Cost --}}
-            <td>-</td> {{-- Feb-26 Cost --}}
-            <td>-</td> {{-- Mar-26 Cost --}}
-            <td>-</td> {{-- Apr-26 Cost --}}
-            <td>-</td> {{-- Total 2026 Cost --}}
-
-            <td>-</td> {{-- Jan-26 Cash --}}
-            <td>-</td> {{-- Feb-26 Cash --}}
-            <td>-</td> {{-- Mar-26 Cash --}}
-            <td>-</td> {{-- Apr-26 Cash --}}
-            <td>-</td> {{-- Total 2026 Cash --}}
+            <td>{{ $budget['commitment_'.($year - 1)] ?? 0 }}</td>
+            <td>{{ $budget['commitment_'.$year] ?? 0 }}</td>
         </tr>
     @endforeach
     </tbody>

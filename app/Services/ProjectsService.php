@@ -130,17 +130,38 @@ class ProjectsService
         return $data;
     }
 
+    // firstOrCreate, not create: this is called from ordinary actions within
+    // an existing cycle (adding a row via the main grid, the "+" blank-row
+    // button) as well as genuine "new cycle" flows, all unconditionally
+    // targeting version 0. Unconditional create() here meant every one of
+    // those ordinary actions minted a brand new duplicate BudgetCyclePeriod
+    // for the same start_year — and once two rows share (start_year, version),
+    // every "latest version" lookup elsewhere (orderBy('version','desc')
+    // ->first(), whereHas(...->where('version', max))) becomes ambiguous
+    // about which row it means, so different pages/queries can silently
+    // resolve to different periods. Reusing the existing row when one already
+    // exists is what prevents that.
+    // $status only applies when a period is first created — firstOrCreate's
+    // second array is ignored on a match, so calling this again for a
+    // (start_year, version 0) that already exists leaves its current
+    // approval_status untouched no matter what $status is passed. That's
+    // intentional here: every caller passes a fixed status regardless of
+    // program flow (e.g. upload()/store()/duplicate() always pass APPROVED),
+    // so honoring it on match would silently reset an already-progressed
+    // period's status back to APPROVED on every subsequent import/save.
     public function saveBudgetCyclePeriod($request, $status){
-        $data = BudgetCyclePeriod::create([
-            'approval_status' => $status,
-            'start_year' => $request->year,
-            'end_year' => $request->year + 4,
-            'total_cost' => 0,
-            'total_cast' => 0,
-            'version' => 0,
-        ]);
-
-        return $data;
+        return BudgetCyclePeriod::firstOrCreate(
+            [
+                'start_year' => $request->year,
+                'version' => 0,
+            ],
+            [
+                'approval_status' => $status,
+                'end_year' => $request->year + 4,
+                'total_cost' => 0,
+                'total_cast' => 0,
+            ]
+        );
     }
 
     public function saveBudget($project,$data){
@@ -297,7 +318,9 @@ class ProjectsService
         $dataCategory = $homeController->getProjectByType($year);
         $dataOwner = $homeController->getProjectByDirectorate($year);
         $dataDirectorateTrend = $homeController->getDirectorateTrend($year);
-        $this->safeBroadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash, $dataCategory, $dataOwner, $dataDirectorateTrend));
+        $dataByType = $homeController->getBudgetByTypeOfInvestment($year);
+        $dataByCategory = $homeController->getBudgetByCategory($year);
+        $this->safeBroadcast(new \App\Events\DashboardUpdated($dataChart, $dataCostCash, $dataCategory, $dataOwner, $dataDirectorateTrend, $dataByType, $dataByCategory, $year));
     }
 
     public function updateBudgets($year, $id){

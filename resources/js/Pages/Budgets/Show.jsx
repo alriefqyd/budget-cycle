@@ -197,7 +197,7 @@ export default function Show() {
     const [deletingData, setDeletingData] = useState(false);
     const [deletingRowId, setDeletingRowId] = useState(null);
     const [deletingCount, setDeletingCount] = useState(0);
-    const [kpiTotals, setKpiTotals] = useState({ car: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 });
+    const [kpiTotals, setKpiTotals] = useState({ fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 });
     const [historyProject, setHistoryProject] = useState(null);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -241,10 +241,13 @@ export default function Show() {
     const recomputeKpiTotals = () => {
         const api = agGridRef.current?.api;
         if (!api) return;
-        const totals = { car: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 };
+        const totals = { fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 };
         api.forEachNodeAfterFilter((node) => {
             if (node.data?.sap_code === 'Total') return;
-            totals.car += parseNumber(node.data?.budget_car);
+            totals.fiveYpCash += parseNumber(node.data?.total_cash);
+            totals.fiveYpCost += parseNumber(node.data?.total_cost);
+            totals.yearCash += parseNumber(node.data?.[`cash_${startYear}`]);
+            totals.yearCost += parseNumber(node.data?.[`cost_${startYear}`]);
             totals.actual += parseNumber(node.data?.actual_to_date);
             totals.actualCost += parseNumber(node.data?.actual_to_date_cost);
             totals.remaining += parseNumber(node.data?.budget_5yp);
@@ -332,7 +335,7 @@ export default function Show() {
                 minWidth: 170,
                 hide: !isTab2,
                 headerClass: color,
-                valueFormatter: params => formatCurrency(params.value),
+                comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
             });
         });
     }
@@ -366,6 +369,16 @@ export default function Show() {
         data[columnToReplicate] = data[colDef.field] || 0;
     }
 
+    // Money values come back from the API as strings (Laravel decimal
+    // columns serialize as e.g. "9995099.00", not a JS number) — AG Grid's
+    // default sort falls back to string comparison for those, which orders
+    // "999,999.99" ahead of "9,436,751.00" (lexicographic, not numeric).
+    // Every currency column needs this to sort correctly.
+    const numericComparator = (valueA, valueB) => {
+        const a = parseFloat(String(valueA ?? '0').replace(/,/g, '')) || 0;
+        const b = parseFloat(String(valueB ?? '0').replace(/,/g, '')) || 0;
+        return a - b;
+    };
 
     const columnDefs = [
         { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:false,
@@ -409,7 +422,7 @@ export default function Show() {
         },
         { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true,
             headerCheckboxSelection: true},
-        { headerName: "Project's Title", field: "project_title",pinned:'left', width: 300},
+        { headerName: "Project's Title", field: "project_title", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.project_title) }, pinned:'left', width: 300},
         { headerName: "Note", field: "note", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.note) } },
         { headerName: "Status", field: "status_progress", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.status_progress) }, cellEditor: 'agSelectCellEditor',cellEditorParams: {
                 values: ['ongoing', 'new', 'new bc'],
@@ -436,8 +449,8 @@ export default function Show() {
             } },
         { headerName: "Risk Residual", field: "risk_residual", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_residual) }, minWidth: 50,enableCellChangeFlash: false },
         { headerName: "Risk Forecast", field: "risk_forecast", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_forecast) }, minWidth: 50,enableCellChangeFlash: false },
-        { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.bc_budget) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
-        { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_car) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.bc_budget) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value) },
+        { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_car) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "CAR Status", field: "_car_variance", enableCellChangeFlash: false, editable: false, filter: false,
             minWidth: 150, sortable: true,
             valueGetter: params => getCarVariance(params.data).pct,
@@ -453,7 +466,7 @@ export default function Show() {
                     filter: ExcelStyleFilter,
                     filterParams: { values: rowData.map(r => r.actual_to_date_cost) },
                     minWidth: 150,
-                    valueFormatter: params => formatCurrency(params.value),
+                    comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
                 },
                 {
                     headerName: "Cash",
@@ -462,22 +475,23 @@ export default function Show() {
                     filter: ExcelStyleFilter,
                     filterParams: { values: rowData.map(r => r.actual_to_date) },
                     minWidth: 150,
-                    valueFormatter: params => formatCurrency(params.value)
+                    comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
                 },
             ]
         },
         {
             headerName: `A/F ${currentYear}`,
             children: [
-                { headerName: "Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cost) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
-                { headerName: "Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cash) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)}
+                { headerName: "Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cost) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cash) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)}
             ]
         },
         {
-            headerName: 'Budget 5YP',
+            headerName: 'Available Budget 5YP',
+            headerClass: 'custom-header-red',
             children: [
-                { headerName: "Cost", field: "budget_5yp_cost", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp_cost) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
-                { headerName: "Cash", field: "budget_5yp", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cost", field: "budget_5yp_cost", headerClass: 'custom-header-red', enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp_cost) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cash", field: "budget_5yp", headerClass: 'custom-header-red', enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)},
             ]
         },
 
@@ -531,7 +545,7 @@ export default function Show() {
                     editable:false,
                     enableCellChangeFlash: false,
                     hide: !isTab2,
-                    valueFormatter: params => formatCurrency(params.value),
+                    comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
                 }
             )
         }
@@ -547,7 +561,7 @@ export default function Show() {
             hide: hide,
             enableCellChangeFlash: false,
             headerClass:'custom-header-green',
-            valueFormatter: params => formatCurrency(params.value)
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
         }
         );
 
@@ -562,7 +576,7 @@ export default function Show() {
                     hide: !isTab2,
                     headerClass:'custom-header-green-2',
                     enableCellChangeFlash: false,
-                    valueFormatter: params => formatCurrency(params.value),
+                    comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
                         'positive-value': params => params.value >= 0
@@ -582,7 +596,7 @@ export default function Show() {
             enableCellChangeFlash: false,
             headerClass:'custom-header-green',
             hide: activeTab === 'Tab1' ? false : true,
-            valueFormatter: params => formatCurrency(params.value)
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
         },
         {
             headerName: "Cost Remaining",
@@ -594,7 +608,7 @@ export default function Show() {
             headerClass:'custom-header-green',
             enableCellChangeFlash: false,
             hide: activeTab === 'Tab1' ? false : true,
-            valueFormatter: params => formatCurrency(params.value),
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
             cellClassRules: {
                 'negative-value': params => params.value < 0,
                 'positive-value': params => params.value >= 0
@@ -615,7 +629,7 @@ export default function Show() {
                     editable:false,
                     enableCellChangeFlash: false,
                     hide: !isTab2,
-                    valueFormatter: params => formatCurrency(params.value),
+                    comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
                 }
             )
         }
@@ -628,7 +642,7 @@ export default function Show() {
             minWidth: 150,
             enableCellChangeFlash: false,
             headerClass:'custom-header-orange',
-            valueFormatter: params => formatCurrency(params.value),
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
             hide: hide,
         });
 
@@ -643,7 +657,7 @@ export default function Show() {
                     enableCellChangeFlash: false,
                     hide: !isTab2,
                     headerClass:'custom-header-orange-2',
-                    valueFormatter: params => formatCurrency(params.value),
+                    comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
                         'positive-value': params => params.value >= 0
@@ -664,7 +678,7 @@ export default function Show() {
             enableCellChangeFlash: false,
             headerClass:'custom-header-orange',
             hide: activeTab === 'Tab1' ? false : true,
-            valueFormatter: params => formatCurrency(params.value)
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
         },
         {
             headerName: "Cash Remaining",
@@ -676,7 +690,7 @@ export default function Show() {
             enableCellChangeFlash: false,
             headerClass:'custom-header-orange',
             hide: activeTab === 'Tab1' ? false : true,
-            valueFormatter: params => formatCurrency(params.value),
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
             cellClassRules: {
                 'negative-value': params => params.value < 0,
                 'positive-value': params => params.value >= 0
@@ -693,7 +707,7 @@ export default function Show() {
             minWidth: 150,
             enableCellChangeFlash: false,
             headerClass: 'custom-header-blue',
-            valueFormatter: params => formatCurrency(params.value),
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
             hide: activeTab === 'Tab1' ? false : true,
         });
     }
@@ -745,27 +759,54 @@ export default function Show() {
     };
 
     const handleImport = async (data) => {
+        setLoading(true);
+        const buildFormData = (dryRun) => {
+            const formData = new FormData();
+            formData.append("file", data.file)
+            formData.append("year", data.year)
+            formData.append("version", versionBudgetPeriod)
+            if (dryRun) formData.append("dry_run", "1");
+            return formData;
+        };
+
+        let preview;
+        try {
+            const previewResponse = await axios.post('/budgets/import-project', buildFormData(true), {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            preview = previewResponse.data;
+        } catch (error) {
+            setLoading(false);
+            Swal.fire({
+                icon: 'error',
+                title: 'Upload Failed',
+                text: error.response?.data?.message || 'Something went wrong',
+            });
+            return;
+        }
+
+        const warningText = preview.deleted > 0
+            ? `${preview.updated} project(s) will be updated. ${preview.deleted} project(s) whose SAP Code is not in this file will be PERMANENTLY DELETED — including "${(preview.deleted_titles || []).slice(0, 3).join('", "')}"${preview.deleted > 3 ? ', and more' : ''}. This cannot be undone!`
+            : `${preview.updated} project(s) will be updated. No existing projects will be deleted.`;
+
         const result = await Swal.fire({
             title: 'Replace data in this version?',
-            text: 'Any project in this version whose SAP Code is not in the uploaded file will be permanently deleted. This cannot be undone!',
+            text: warningText,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, import and replace',
+            confirmButtonText: preview.deleted > 0 ? `Yes, delete ${preview.deleted} and import` : 'Yes, import',
             cancelButtonText: 'Cancel'
         });
 
-        if (!result.isConfirmed) return;
-
-        setLoading(true)
-        const formData = new FormData();
-        formData.append("file", data.file)
-        formData.append("year", data.year)
-        formData.append("version", versionBudgetPeriod)
+        if (!result.isConfirmed) {
+            setLoading(false);
+            return;
+        }
 
         try {
-            const response = await axios.post('/budgets/import-project', formData, {
+            const response = await axios.post('/budgets/import-project', buildFormData(false), {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
@@ -1804,22 +1845,24 @@ export default function Show() {
                                         Import Data
                                     </button>
                                 )}
-                                <button
-                                    onClick={handleExport}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
-                                >
-                                    {loading ? (
-                                        <>
-                                            <Spinner color="text-primary"/>
-                                            <span>Export Data...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="material-symbols-outlined text-[18px] opacity-70">download</span>
-                                            Export Data
-                                        </>
-                                    )}
-                                </button>
+                                {!isViewer && (
+                                    <button
+                                        onClick={handleExport}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Spinner color="text-primary"/>
+                                                <span>Export Data...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="material-symbols-outlined text-[18px] opacity-70">download</span>
+                                                Export Data
+                                            </>
+                                        )}
+                                    </button>
+                                )}
                                 {!isViewer && (
                                     <button
                                         onClick={handleDuplicateRow}
@@ -1899,15 +1942,35 @@ export default function Show() {
                 </div>
 
                 {/* KPI summary — reflects whatever is currently passing the grid's filters */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-stack-sm">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-stack-sm">
                     <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
                         <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0">
                             <span className="material-symbols-outlined text-on-primary-container text-[16px]">account_balance_wallet</span>
                         </div>
                         <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Total CAR (Approved)</p>
-                            <p className="text-lg font-semibold text-on-surface truncate" title={formatCurrency(kpiTotals.car)}>
-                                {formatCompactCurrency(kpiTotals.car)}
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Total 5YP Budget {startYear}-{endYear}</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={`Cash: ${formatCurrency(kpiTotals.fiveYpCash)}`}>
+                                {formatCompactCurrency(kpiTotals.fiveYpCash)}
+                                <span className="text-body-sm font-normal text-on-surface-variant"> Cash</span>
+                            </p>
+                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Cost: ${formatCurrency(kpiTotals.fiveYpCost)}`}>
+                                {formatCompactCurrency(kpiTotals.fiveYpCost)} Cost
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-on-primary-container text-[16px]">calendar_month</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Total Budget {startYear}</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={`Cash: ${formatCurrency(kpiTotals.yearCash)}`}>
+                                {formatCompactCurrency(kpiTotals.yearCash)}
+                                <span className="text-body-sm font-normal text-on-surface-variant"> Cash</span>
+                            </p>
+                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Cost: ${formatCurrency(kpiTotals.yearCost)}`}>
+                                {formatCompactCurrency(kpiTotals.yearCost)} Cost
                             </p>
                         </div>
                     </div>
@@ -2006,7 +2069,13 @@ export default function Show() {
                                 columnDefs={columnDefs}
                                 defaultColDef={{
                                     ...defaultColDef,
-                                    editable: isLatestVersion && !isFinal && !isViewer,   // <--- globally disable editing
+                                    // The pinned "Total" row (see pinnedTopRowData below) is a
+                                    // client-computed aggregate, not a real project — it doesn't
+                                    // have a numeric `id` (calculateTotals() sets id: 'Total (USD)'),
+                                    // so editing it and triggering a save PUTs to
+                                    // /budgets/Total%20(USD), which 404s. Never editable regardless
+                                    // of version/lock state.
+                                    editable: (params) => !params.node.rowPinned && isLatestVersion && !isFinal && !isViewer,
                                 }}
                                 suppressClickEdit={!(isLatestVersion && !isFinal && !isViewer)}  // <--- prevent entering edit mode
                                 // pagination={true}

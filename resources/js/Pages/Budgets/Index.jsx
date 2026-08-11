@@ -19,6 +19,34 @@ export default function Budgets() {
         return item.start_year
     })
 
+    const formatCompactCurrency = (value) => {
+        const num = Number(value) || 0;
+        const sign = num < 0 ? '-' : '';
+        const abs = Math.abs(num);
+        if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`;
+        if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+        if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
+        return `${sign}$${abs.toFixed(2)}`;
+    };
+
+    const formatCurrency = (value) => {
+        if (value == null || isNaN(value)) return '$0.00';
+        return `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    // Grand total across every budget cycle period listed below — cash/cost
+    // come straight off each period's own total, commitment has no per-period
+    // total field (intentionally, see RowTable) so it's summed fresh from
+    // each period's costCashYearlies breakdown.
+    const grandTotals = projectState.reduce((acc, item) => {
+        acc.cash += Number(item.total_cash) || 0;
+        acc.cost += Number(item.total_cost) || 0;
+        acc.commitment += (item.costCashYearlies || [])
+            .filter(row => row.type === 'commitment')
+            .reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+        return acc;
+    }, { cash: 0, cost: 0, commitment: 0 });
+
     useEffect(() => {
         const channel = window.Echo.channel('budgetList')
             .listen('.budgetList.update', (event) => {
@@ -113,6 +141,43 @@ export default function Budgets() {
                             </button>
                         </div>
                     )}
+                </div>
+
+                {/* Grand Total — across every budget cycle period listed below */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-stack-sm">
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className="w-8 h-8 rounded-full bg-[#e6fff1] flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[#006545] text-[16px]">payments</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Grand Total Cash</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={formatCurrency(grandTotals.cash)}>
+                                {formatCompactCurrency(grandTotals.cash)}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className="w-8 h-8 rounded-full bg-[#e5f1ff] flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[#005c99] text-[16px]">account_balance_wallet</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Grand Total Cost</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={formatCurrency(grandTotals.cost)}>
+                                {formatCompactCurrency(grandTotals.cost)}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
+                        <div className="w-8 h-8 rounded-full bg-[#eef2ff] flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[#3730a3] text-[16px]">handshake</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Grand Total Commitment</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={formatCurrency(grandTotals.commitment)}>
+                                {formatCompactCurrency(grandTotals.commitment)}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Detailed Breakdown Card */}

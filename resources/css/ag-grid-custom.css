@@ -100,11 +100,25 @@
     color: #3730a3; /* on-indigo-fixed-variant, matches RowTable's commitment pill */
 }
 
+/* Available Budget 5YP — the key planning figure everything else
+   (distribution, remaining, mismatch warnings) is measured against, so it
+   gets its own distinct color to stand out at a glance across ~50 other
+   columns. */
 .custom-header-red {
-    background-color: #dce9ff;
+    background-color: #fef9c3; /* light yellow */
 }
 .custom-header-red .ag-header-cell-label {
     font-weight: 800;
+    color: #713f12; /* on-yellow-fixed-variant */
+}
+.custom-header-red .ag-header-group-cell-label {
+    font-weight: 800;
+    color: #713f12;
+}
+.custom-header-red .ag-icon,
+.custom-header-red .ag-header-icon {
+    color: #713f12;
+    opacity: 0.9;
 }
 
 .custom-header-green,

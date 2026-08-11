@@ -16,8 +16,14 @@ class DashboardUpdated implements ShouldBroadcastNow
 
     public array $data;
     public array $dataCostCash;
+    public array $dataCategory;
+    public array $dataOwner;
+    public array $dataDirectorateTrend;
+    public array $dataByType;
+    public array $dataByCategory;
+    public $year;
 
-    public function __construct(array $data, array $dataCostCash, array $dataCategory, array $dataOwner, array $dataDirectorateTrend = [])
+    public function __construct(array $data, array $dataCostCash, array $dataCategory, array $dataOwner, array $dataDirectorateTrend = [], array $dataByType = [], array $dataByCategory = [], $year = null)
     {
         Log::info("DashboardUpdated");
 
@@ -26,6 +32,9 @@ class DashboardUpdated implements ShouldBroadcastNow
         $this->dataCategory = $dataCategory;
         $this->dataOwner = $dataOwner;
         $this->dataDirectorateTrend = $dataDirectorateTrend;
+        $this->dataByType = $dataByType;
+        $this->dataByCategory = $dataByCategory;
+        $this->year = $year;
     }
 
     public function broadcastOn(): array
@@ -47,6 +56,9 @@ class DashboardUpdated implements ShouldBroadcastNow
             'dataCategory' => $this->dataCategory,
             'dataOwner' => $this->dataOwner,
             'dataDirectorateTrend' => $this->dataDirectorateTrend,
+            'dataByType' => $this->dataByType,
+            'dataByCategory' => $this->dataByCategory,
+            'year' => $this->year,
         ];
     }
 }
