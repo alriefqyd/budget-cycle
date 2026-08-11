@@ -79,7 +79,7 @@ export default function MyForecast() {
             });
         } catch (error) {
             console.error('Failed to save forecast:', error);
-            Swal.fire('Gagal menyimpan', error.response?.data?.message || 'Terjadi kesalahan, coba lagi.', 'error');
+            Swal.fire('Failed to save', error.response?.data?.message || 'An error occurred, please try again.', 'error');
         } finally {
             setSavingId(null);
         }
@@ -111,15 +111,15 @@ export default function MyForecast() {
                     <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                     <Link href={`/budgets/${startYear}`} className="font-body-sm text-body-sm hover:text-primary transition-colors">{startYear} - {endYear}</Link>
                     <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                    <span className="font-body-sm text-body-sm font-bold text-primary">Forecast Sederhana</span>
+                    <span className="font-body-sm text-body-sm font-bold text-primary">Simple Forecast</span>
                 </nav>
 
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-stack-md">
                     <div>
-                        <h2 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">Forecast Sederhana</h2>
+                        <h2 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">Simple Forecast</h2>
                         <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-                            Cek dan update forecast per project — isi berapa yang akan dipakai tahun ini &amp; tahun depan dari CAR yang sudah disetujui. Detail bulanan tetap diatur di{' '}
-                            <Link href={`/budgets/${startYear}`} className="text-primary underline">halaman utama</Link>.
+                            Review and update the forecast per project — fill in how much of the approved CAR will be used this year &amp; next year. Monthly detail is still managed on the{' '}
+                            <Link href={`/budgets/${startYear}`} className="text-primary underline">main page</Link>.
                         </p>
                     </div>
                     {isFinal && (
@@ -135,7 +135,7 @@ export default function MyForecast() {
                         <span className="material-symbols-outlined text-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-60">search</span>
                         <input
                             type="text"
-                            placeholder="Cari SAP code / judul project..."
+                            placeholder="Search SAP code / project title..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-9 pr-3 py-2 w-72 rounded-lg border border-outline-variant bg-surface text-body-sm focus:ring-1 focus:ring-primary outline-none"
@@ -148,14 +148,14 @@ export default function MyForecast() {
                             onChange={(e) => setPmFilter(e.target.value)}
                             className="appearance-none bg-surface border border-outline-variant rounded-lg px-3 pr-8 py-2 font-label-caps text-label-caps focus:ring-1 focus:ring-primary outline-none"
                         >
-                            <option value="all">Semua PM</option>
+                            <option value="all">All PM</option>
                             {pmList.map((pm) => (
                                 <option key={pm} value={pm}>{pm}</option>
                             ))}
                         </select>
                     </div>
                     <span className="font-body-sm text-body-sm text-on-surface-variant">
-                        {filteredRows.length} dari {rows.length} project
+                        {filteredRows.length} of {rows.length} projects
                     </span>
                 </div>
 
@@ -172,8 +172,8 @@ export default function MyForecast() {
                                     <th className="px-4 py-3 font-label-caps text-label-caps text-right whitespace-nowrap">Forecast Cost</th>
                                     <th className="px-4 py-3 font-label-caps text-label-caps text-right whitespace-nowrap">Forecast Cash</th>
                                     <th className="px-4 py-3 font-label-caps text-label-caps whitespace-nowrap">Start Year</th>
-                                    <th className="px-4 py-3 font-label-caps text-label-caps whitespace-nowrap">Jumlah Tahun</th>
-                                    <th className="px-4 py-3 font-label-caps text-label-caps text-right whitespace-nowrap">Sisa CAR (Cash)</th>
+                                    <th className="px-4 py-3 font-label-caps text-label-caps whitespace-nowrap">Number of Years</th>
+                                    <th className="px-4 py-3 font-label-caps text-label-caps text-right whitespace-nowrap">Remaining CAR (Cash)</th>
                                     <th className="px-4 py-3 w-8"></th>
                                 </tr>
                             </thead>
@@ -230,7 +230,7 @@ export default function MyForecast() {
                                 {filteredRows.length === 0 && (
                                     <tr>
                                         <td colSpan={11} className="px-4 py-10 text-center text-on-surface-variant font-body-sm text-body-sm">
-                                            Tidak ada project yang cocok.
+                                            No matching projects.
                                         </td>
                                     </tr>
                                 )}

@@ -22,6 +22,11 @@ function formatDateTime(value) {
     });
 }
 
+function formatValue(value) {
+    if (value === null || value === undefined || value === '') return '(empty)';
+    return String(value);
+}
+
 export default function ActivityLogsIndex() {
     const { logs, users, actions, filters } = usePage().props;
 
@@ -119,6 +124,18 @@ export default function ActivityLogsIndex() {
                                             </td>
                                             <td className="px-6 py-4 text-on-surface-variant text-sm">
                                                 {log.description}
+                                                {log.properties && Object.keys(log.properties).length > 0 && (
+                                                    <ul className="mt-1.5 space-y-0.5 border-l-2 border-outline-variant pl-2.5">
+                                                        {Object.entries(log.properties).map(([field, diff]) => (
+                                                            <li key={field} className="text-xs text-on-surface-variant/80">
+                                                                <span className="font-mono">{field}</span>:{' '}
+                                                                <span className="line-through decoration-error/60">{formatValue(diff.old)}</span>
+                                                                {' → '}
+                                                                <span className="font-medium text-on-surface">{formatValue(diff.new)}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
                                             </td>
                                         </tr>
                                     );

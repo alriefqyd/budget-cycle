@@ -43,9 +43,14 @@ class ProjectsController extends Controller
     // look up the "before" value for each changed key.
     private static array $unloggedFields = ['id', 'created_at', 'updated_at', 'project_id', 'budget_cycle_period_id'];
 
-    private function logProjectChanges(Projects $project, array $original, array $changes): void
+    // Returns the field => ['old' => ..., 'new' => ...] map of everything it
+    // actually logged (post unloggedFields/no-op filtering), so callers can
+    // reuse the exact same diff for an ActivityLog's `properties` instead of
+    // recomputing it separately.
+    private function logProjectChanges(Projects $project, array $original, array $changes): array
     {
         $userId = auth()->id();
+        $logged = [];
         foreach ($changes as $field => $newValue) {
             if (in_array($field, self::$unloggedFields, true)) {
                 continue;
@@ -61,7 +66,10 @@ class ProjectsController extends Controller
                 'old_value' => $oldValue,
                 'new_value' => $newValue,
             ]);
+            $logged[$field] = ['old' => $oldValue, 'new' => $newValue];
         }
+
+        return $logged;
     }
 
     public function index(){
@@ -346,14 +354,9 @@ class ProjectsController extends Controller
                 ]);
             }
 
-            $changedFields = array_keys(array_diff_key($project->getChanges(), array_flip(self::$unloggedFields)));
+            $properties = $this->logProjectChanges($project, $projectOriginal, $project->getChanges());
             if ($budgetOriginal) {
-                $changedFields = array_merge($changedFields, array_keys(array_diff_key($budget->getChanges(), array_flip(self::$unloggedFields))));
-            }
-
-            $this->logProjectChanges($project, $projectOriginal, $project->getChanges());
-            if ($budgetOriginal) {
-                $this->logProjectChanges($project, $budgetOriginal, $budget->getChanges());
+                $properties += $this->logProjectChanges($project, $budgetOriginal, $budget->getChanges());
             }
 
             // Yearly cash/cost/commitment amounts live on CashCostYearly, not
@@ -409,15 +412,15 @@ class ProjectsController extends Controller
                 }
             }
 
-            $this->logProjectChanges($project, $yearlyOriginal, $yearlyChanges);
-            foreach ($yearlyChanges as $field => $newValue) {
-                if (($yearlyOriginal[$field] ?? null) != $newValue) {
-                    $changedFields[] = $field;
-                }
-            }
+            $properties += $this->logProjectChanges($project, $yearlyOriginal, $yearlyChanges);
 
-            if ($changedFields) {
-                ActivityLog::record('project.updated', "Updated project \"{$project->project_title}\" ({$project->sap_code}): " . implode(', ', $changedFields), $project);
+            if ($properties) {
+                ActivityLog::record(
+                    'project.updated',
+                    "Updated project \"{$project->project_title}\" ({$project->sap_code}): " . implode(', ', array_keys($properties)),
+                    $project,
+                    $properties
+                );
             }
 
             DB::commit();

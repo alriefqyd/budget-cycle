@@ -89,7 +89,7 @@ export default function ColumnVisibilityPanel({ api, columnDefs }) {
                     <input
                         type="text"
                         autoFocus
-                        placeholder="Cari kolom..."
+                        placeholder="Search columns..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full px-2 py-1.5 mb-2 border border-outline-variant rounded-lg text-sm focus:ring-1 focus:ring-primary outline-none"
@@ -101,7 +101,7 @@ export default function ColumnVisibilityPanel({ api, columnDefs }) {
                             checked={allSelected}
                             onChange={toggleSelectAll}
                         />
-                        Pilih Semua
+                        Select All
                     </label>
                     <div className="max-h-72 overflow-y-auto">
                         {visible.map(col => {
@@ -119,7 +119,7 @@ export default function ColumnVisibilityPanel({ api, columnDefs }) {
                             );
                         })}
                         {visible.length === 0 && (
-                            <p className="text-on-surface-variant text-sm px-1 py-2">Tidak ada hasil.</p>
+                            <p className="text-on-surface-variant text-sm px-1 py-2">No results.</p>
                         )}
                     </div>
                 </div>

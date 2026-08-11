@@ -58,13 +58,7 @@ class ProjectsService
             // Build yearly summary from start_year to end_year
             $costCashYearlies = collect();
             for ($year = $start_year; $year <= $end_year; $year++) {
-                foreach (['cost', 'cash', 'commitment'] as $type) {
-                    // Commitment only applies to the first two years of the cycle
-                    // (matches the Show.jsx grid's `yearlyBudget = startYear + 2` window).
-                    if ($type === 'commitment' && $year >= $start_year + 2) {
-                        continue;
-                    }
-
+                foreach (['cost', 'cash'] as $type) {
                     $amount = $allYearly
                         ->where('year', (string)$year)
                         ->where('type', $type)
@@ -78,6 +72,24 @@ class ProjectsService
                         'amount' => $amount
                     ]);
                 }
+            }
+
+            // Commitment only applies to the cycle's start year and the year
+            // before it (matches the Show.jsx grid's window), not the full
+            // start_year..end_year range cost/cash use above.
+            foreach ([$start_year - 1, $start_year] as $year) {
+                $amount = $allYearly
+                    ->where('year', (string)$year)
+                    ->where('type', 'commitment')
+                    ->sum(function ($item) {
+                        return (float)$item->amount;
+                    });
+
+                $costCashYearlies->push((object)[
+                    'year' => $year,
+                    'type' => 'commitment',
+                    'amount' => $amount
+                ]);
             }
 
             $dataPeriod = BudgetCyclePeriod::where('start_year', $start_year)->orderBy('version','desc')->first();

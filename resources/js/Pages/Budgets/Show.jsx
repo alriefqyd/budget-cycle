@@ -187,6 +187,7 @@ export default function Show() {
     const startYear = parseInt(pathParts[pathParts.length - 1]) || new Date().getFullYear();
     const endYear = startYear + 4;
     const yearlyBudget = startYear + 2;
+    const currentYear = new Date().getFullYear();
     const month = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const [selectedRowsState, setSelectedRowsState] = useState([]);
     const [budgetTotalYear, setBudgetTotalYear] = useState(0);
@@ -443,7 +444,7 @@ export default function Show() {
             cellRenderer: CarVarianceRenderer,
         },
         {
-            headerName: "Actual Up to 2024 ",
+            headerName: `Actual Up to ${currentYear - 1}`,
             children: [
                 {
                     headerName: "Cost",
@@ -466,7 +467,7 @@ export default function Show() {
             ]
         },
         {
-            headerName: "A/F 2025",
+            headerName: `A/F ${currentYear}`,
             children: [
                 { headerName: "Cost", field: "forecast_cost", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cost) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)},
                 { headerName: "Cash", field: "forecast_cash", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.forecast_cash) }, minWidth: 150, valueFormatter: params => formatCurrency(params.value)}
@@ -683,7 +684,7 @@ export default function Show() {
         }
     )
 
-    for (let year = startYear; year < yearlyBudget; year++) {
+    for (let year = startYear - 1; year <= startYear; year++) {
         columnDefs.push({
             headerName: `Commitment - ${year}`,
             field: `commitment_${year}`,
@@ -886,10 +887,12 @@ export default function Show() {
             cost_remaining: 0
         };
 
+        newRow[`commitment_${startYear - 1}`] = 0;
+
         for (let year = startYear; year <= endYear; year++) {
             newRow[`cost_${year}`] = 0;
             newRow[`cash_${year}`] = 0;
-            if (year < yearlyBudget) {
+            if (year === startYear) {
                 newRow[`commitment_${year}`] = 0;
             }
             newRow[`cost_${year}_remaining`] = 0;
@@ -970,12 +973,13 @@ export default function Show() {
             total_cash:0,
             total_cost:0
         };
+        totals[`commitment_${startYear - 1}`] = 0;
         for(let i = startYear; i< endYear + 1; i++){
             const cashField = `cash_${i}`;
             const costField = `cost_${i}`;
             totals[cashField] = 0;
             totals[costField] = 0;
-            if (i < yearlyBudget) {
+            if (i === startYear) {
                 totals[`commitment_${i}`] = 0;
             }
         }
@@ -987,12 +991,13 @@ export default function Show() {
                 .map(key => rowData[key]);
 
         arrayData.forEach(row => {
+            totals[`commitment_${startYear - 1}`] += parseNumber(row[`commitment_${startYear - 1}`]);
             for (let i = startYear; i <= endYear; i++) {
                 const cashField = `cash_${i}`;
                 const costField = `cost_${i}`;
                 totals[cashField] += parseNumber(row[cashField]);
                 totals[costField] += parseNumber(row[costField]);
-                if (i < yearlyBudget) {
+                if (i === startYear) {
                     totals[`commitment_${i}`] += parseNumber(row[`commitment_${i}`]);
                 }
             }
@@ -1055,10 +1060,11 @@ export default function Show() {
             };
 
             // Initialize dynamic year-based fields
+            totals[`commitment_${startYear - 1}`] = 0;
             for (let year = startYear; year <= endYear + 1; year++) {
                 totals[`cash_${year}`] = 0;
                 totals[`cost_${year}`] = 0;
-                if (year < yearlyBudget) {
+                if (year === startYear) {
                     totals[`commitment_${year}`] = 0;
                 }
             }
@@ -1068,10 +1074,11 @@ export default function Show() {
                 const row = node.data;
                 if (row.sap_code === 'Total') return; // Skip total row
 
+                totals[`commitment_${startYear - 1}`] += parseNumber(row[`commitment_${startYear - 1}`]);
                 for (let year = startYear; year <= endYear; year++) {
                     totals[`cash_${year}`] += parseNumber(row[`cash_${year}`]);
                     totals[`cost_${year}`] += parseNumber(row[`cost_${year}`]);
-                    if (year < yearlyBudget) {
+                    if (year === startYear) {
                         totals[`commitment_${year}`] += parseNumber(row[`commitment_${year}`]);
                     }
                 }
@@ -1926,7 +1933,7 @@ export default function Show() {
                             <span className={`material-symbols-outlined text-[16px] ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-tertiary-container'}`}>savings</span>
                         </div>
                         <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Sisa Forecast (Belum Terpakai)</p>
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Remaining Forecast (Unused)</p>
                             <p className={`text-lg font-semibold truncate ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-surface'}`} title={formatCurrency(kpiTotals.remaining)}>
                                 {formatCompactCurrency(kpiTotals.remaining)}
                             </p>
@@ -1938,7 +1945,7 @@ export default function Show() {
                             <span className="material-symbols-outlined text-on-surface-variant text-[16px]">folder_open</span>
                         </div>
                         <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Jumlah Project</p>
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Number of Projects</p>
                             <p className="text-lg font-semibold text-on-surface truncate">
                                 {kpiTotals.count.toLocaleString('en-US')}
                             </p>

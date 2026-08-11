@@ -9,7 +9,7 @@ import { useGridFilter } from "ag-grid-react";
 // Usage on a colDef:
 //   { field: "project_manager", filter: ExcelStyleFilter,
 //     filterParams: { values: uniqueProjectManagerNames } }
-const BLANK_LABEL = "(Kosong)";
+const BLANK_LABEL = "(Empty)";
 
 const ExcelStyleFilter = (props) => {
     const { model, onModelChange, values = [], getValue } = props;
@@ -71,18 +71,18 @@ const ExcelStyleFilter = (props) => {
             <input
                 type="text"
                 autoFocus
-                placeholder="Cari..."
+                placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full px-2 py-1.5 mb-2 border border-outline-variant rounded-lg text-sm focus:ring-1 focus:ring-primary outline-none"
             />
             <label className="flex items-center gap-2 px-1 py-1 font-bold cursor-pointer border-b border-outline-variant pb-2 mb-1">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
-                (Pilih Semua)
+                (Select All)
             </label>
             <div className="max-h-56 overflow-y-auto">
                 {visibleOptions.length === 0 && (
-                    <p className="text-on-surface-variant px-1 py-2">Tidak ada hasil.</p>
+                    <p className="text-on-surface-variant px-1 py-2">No results.</p>
                 )}
                 {visibleOptions.map((value) => (
                     <label key={value} className="flex items-center gap-2 px-1 py-1 hover:bg-surface-container rounded cursor-pointer">
@@ -97,14 +97,14 @@ const ExcelStyleFilter = (props) => {
                     onClick={() => applySelection(new Set())}
                     className="text-xs text-error hover:underline"
                 >
-                    Hapus Semua
+                    Clear All
                 </button>
                 <button
                     type="button"
                     onClick={() => applySelection(new Set(optionValues))}
                     className="text-xs text-primary hover:underline"
                 >
-                    Pilih Semua
+                    Select All
                 </button>
             </div>
         </div>
