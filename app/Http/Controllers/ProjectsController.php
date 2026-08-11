@@ -350,21 +350,28 @@ class ProjectsController extends Controller
             if ($budgetOriginal) {
                 $changedFields = array_merge($changedFields, array_keys(array_diff_key($budget->getChanges(), array_flip(self::$unloggedFields))));
             }
-            if ($changedFields) {
-                ActivityLog::record('project.updated', "Updated project \"{$project->project_title}\" ({$project->sap_code}): " . implode(', ', $changedFields), $project);
-            }
 
             $this->logProjectChanges($project, $projectOriginal, $project->getChanges());
             if ($budgetOriginal) {
                 $this->logProjectChanges($project, $budgetOriginal, $budget->getChanges());
             }
 
+            // Yearly cash/cost/commitment amounts live on CashCostYearly, not
+            // Projects/BudgetSetting, so they're invisible to getChanges() above —
+            // tracked separately here and folded into the same change log +
+            // activity summary.
+            $yearlyOriginal = [];
+            $yearlyChanges = [];
+
             foreach ($request->all() as $key => $value) {
-                if (preg_match('/^(cash|cost)_(\d{4})$/', $key, $matches)) {
-                    $type = $matches[1]; // 'cash' or 'cost'
+                if (preg_match('/^(cash|cost|commitment)_(\d{4})$/', $key, $matches)) {
+                    $type = $matches[1]; // 'cash', 'cost', or 'commitment'
                     $year = $matches[2]; // e.g. '2025'
 
                     $costCashYearly = CashCostYearly::where('year', $year)->where('type', $type)->where('project_id', $request->id)->first();
+                    $yearlyOriginal[$key] = $costCashYearly?->amount;
+                    $yearlyChanges[$key] = $value;
+
                     // Save to DB, for example:
                     if($costCashYearly){
                         $costCashYearly->amount = $value;
@@ -400,6 +407,17 @@ class ProjectsController extends Controller
                         ]);
                     }
                 }
+            }
+
+            $this->logProjectChanges($project, $yearlyOriginal, $yearlyChanges);
+            foreach ($yearlyChanges as $field => $newValue) {
+                if (($yearlyOriginal[$field] ?? null) != $newValue) {
+                    $changedFields[] = $field;
+                }
+            }
+
+            if ($changedFields) {
+                ActivityLog::record('project.updated', "Updated project \"{$project->project_title}\" ({$project->sap_code}): " . implode(', ', $changedFields), $project);
             }
 
             DB::commit();

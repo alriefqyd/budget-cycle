@@ -683,6 +683,20 @@ export default function Show() {
         }
     )
 
+    for (let year = startYear; year < yearlyBudget; year++) {
+        columnDefs.push({
+            headerName: `Commitment - ${year}`,
+            field: `commitment_${year}`,
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r[`commitment_${year}`]) },
+            minWidth: 150,
+            enableCellChangeFlash: false,
+            headerClass: 'custom-header-blue',
+            valueFormatter: params => formatCurrency(params.value),
+            hide: activeTab === 'Tab1' ? false : true,
+        });
+    }
+
     // Bakes the persisted hide preference into columnDefs itself (see
     // hiddenColumnsPref above) rather than relying on a one-off imperative
     // api.setColumnsVisible() call, so it survives every re-render, not just
@@ -875,6 +889,9 @@ export default function Show() {
         for (let year = startYear; year <= endYear; year++) {
             newRow[`cost_${year}`] = 0;
             newRow[`cash_${year}`] = 0;
+            if (year < yearlyBudget) {
+                newRow[`commitment_${year}`] = 0;
+            }
             newRow[`cost_${year}_remaining`] = 0;
             newRow[`cash_${year}_remaining`] = 0;
 
@@ -958,6 +975,9 @@ export default function Show() {
             const costField = `cost_${i}`;
             totals[cashField] = 0;
             totals[costField] = 0;
+            if (i < yearlyBudget) {
+                totals[`commitment_${i}`] = 0;
+            }
         }
 
         const arrayData = Array.isArray(rowData)
@@ -972,6 +992,9 @@ export default function Show() {
                 const costField = `cost_${i}`;
                 totals[cashField] += parseNumber(row[cashField]);
                 totals[costField] += parseNumber(row[costField]);
+                if (i < yearlyBudget) {
+                    totals[`commitment_${i}`] += parseNumber(row[`commitment_${i}`]);
+                }
             }
             totals.total_cash += parseNumber(row.total_cash);
             totals.total_cost += parseNumber(row.total_cost);
@@ -1035,6 +1058,9 @@ export default function Show() {
             for (let year = startYear; year <= endYear + 1; year++) {
                 totals[`cash_${year}`] = 0;
                 totals[`cost_${year}`] = 0;
+                if (year < yearlyBudget) {
+                    totals[`commitment_${year}`] = 0;
+                }
             }
 
             // Sum values dynamically
@@ -1045,6 +1071,9 @@ export default function Show() {
                 for (let year = startYear; year <= endYear; year++) {
                     totals[`cash_${year}`] += parseNumber(row[`cash_${year}`]);
                     totals[`cost_${year}`] += parseNumber(row[`cost_${year}`]);
+                    if (year < yearlyBudget) {
+                        totals[`commitment_${year}`] += parseNumber(row[`commitment_${year}`]);
+                    }
                 }
 
                 totals.total_cash += parseNumber(row.total_cash);
@@ -1202,6 +1231,11 @@ export default function Show() {
             updateCostMonthlyRemaining(data, colDef)
             updateTotalYearlyCostCash()
 
+            api.refreshCells({ force: true });
+        }
+
+        if (/^commitment_\d{4}$/.test(colDef.field)) {
+            updateTotalYearlyCostCash();
             api.refreshCells({ force: true });
         }
 

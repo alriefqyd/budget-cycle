@@ -89,9 +89,15 @@
    money flows are distinguishable at a glance across all ~50 year/month
    columns: Cost = light green (the same tertiary-family swatch already
    used for .positive-value), Cash = light orange/amber, its complement. */
-.custom-header-gray,
-.custom-header-blue {
+.custom-header-gray {
     background-color: #dce9ff; /* same as the base header — surface-container-high; now unused but left neutral */
+}
+
+.custom-header-blue {
+    background-color: #e0e4fb; /* light indigo, Commitment columns' third color alongside Cost's green and Cash's orange */
+}
+.custom-header-blue .ag-header-cell-label {
+    color: #3730a3; /* on-indigo-fixed-variant, matches RowTable's commitment pill */
 }
 
 .custom-header-red {

@@ -7,7 +7,7 @@ import Dropdown from "@/Components/Dropdown.jsx";
 // also control them would fight with that tab logic and confuse the "N
 // hidden" count with columns that are only hidden because of the tab, not a
 // deliberate user choice. Only the tab-independent columns are listed here.
-export const TAB_CONTROLLED_FIELD = /^(total_)?(cost|cash)_\d+(_\d+)?(_remaining)?$/;
+export const TAB_CONTROLLED_FIELD = /^(total_)?(cost|cash|commitment)_\d+(_\d+)?(_remaining)?$/;
 
 // Flattens columnDefs (which nests year/actual/forecast columns under
 // group headers via `children`) into a single list of {field, label} for

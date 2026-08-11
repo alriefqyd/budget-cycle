@@ -55,11 +55,16 @@ class ProjectsService
                 return (float)$item->amount;
             });
 
-
             // Build yearly summary from start_year to end_year
             $costCashYearlies = collect();
             for ($year = $start_year; $year <= $end_year; $year++) {
-                foreach (['cost', 'cash'] as $type) {
+                foreach (['cost', 'cash', 'commitment'] as $type) {
+                    // Commitment only applies to the first two years of the cycle
+                    // (matches the Show.jsx grid's `yearlyBudget = startYear + 2` window).
+                    if ($type === 'commitment' && $year >= $start_year + 2) {
+                        continue;
+                    }
+
                     $amount = $allYearly
                         ->where('year', (string)$year)
                         ->where('type', $type)
@@ -143,7 +148,7 @@ class ProjectsService
 
     public function saveCashCostYearly($project,$data){
         foreach ($data as $key => $value) {
-            if (preg_match('/^(cash|cost)_(\d{4})$/', $key, $matches)) {
+            if (preg_match('/^(cash|cost|commitment)_(\d{4})$/', $key, $matches)) {
                 $type = $matches[1];
                 $year = $matches[2];
                CashCostYearly::create([

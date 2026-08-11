@@ -84,6 +84,20 @@ export default function RowTable(props) {
                                 </td>
                             ))}
                         </tr>
+                        <tr className="border-t border-outline-variant/30">
+                            <td className="px-2 py-0.5 text-[10px] font-label-caps text-[#3730a3] text-left whitespace-nowrap">
+                                Commitment
+                            </td>
+                            {years.map((year) => (
+                                <td
+                                    key={`commitment-${year}`}
+                                    title={currency(amountFor(year, 'commitment'))}
+                                    className="px-2 py-0.5 text-[11px] text-right text-on-surface tabular-nums whitespace-nowrap"
+                                >
+                                    {compactCurrency(amountFor(year, 'commitment'))}
+                                </td>
+                            ))}
+                        </tr>
                     </tbody>
                 </table>
             </td>
