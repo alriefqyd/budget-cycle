@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Mockery\Exception;
 
 
 class ProjectsController extends Controller
@@ -212,7 +211,7 @@ class ProjectsController extends Controller
         try {
             $projectService = new ProjectsService;
             $budgets = $projectService->getBudgetsByYear($request->year, null);
-            return Excel::download(new BudgetCyclePlanExport($budgets), 'Budget-Cycle-'.$request->year.'.xlsx');
+            return Excel::download(new BudgetCyclePlanExport($budgets, $request->year), 'Budget-Cycle-'.$request->year.'.xlsx');
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,

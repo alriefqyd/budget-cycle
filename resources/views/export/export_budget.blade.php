@@ -16,27 +16,27 @@
         <th>Risk Forecast</th>
         <th>BC Budget</th>
         <th>Approved Budget</th>
-        <th>Actual Up to 2024 Cost</th>
-        <th>Actual Up to 2024Cash</th>
-        <th>A/F 2025 Cost</th>
-        <th>A/F 2025Cash</th>
+        <th>Actual Up to {{ now()->year - 1 }} Cost</th>
+        <th>Actual Up to {{ now()->year - 1 }} Cash</th>
+        <th>A/F {{ now()->year }} Cost</th>
+        <th>A/F {{ now()->year }} Cash</th>
         <th>Budget 5YP Cost</th>
         <th>Budget 5YP Cash</th>
         <th>Start year</th>
         <th>Budget Year 1/2/3/4/5</th>
         <th>Fund</th>
-        <th>Cost 2026 (USD)</th>
-        <th>Cost 2027 (USD)</th>
-        <th>Cost 2028 (USD)</th>
-        <th>Cost 2029 (USD)</th>
-        <th>Cost 2030 (USD)</th>
-        <th>Cost 2026-2030 (USD)</th>
-        <th>Cash 2026 (USD)</th>
-        <th>Cash 2027 (USD)</th>
-        <th>Cash 2028 (USD)</th>
-        <th>Cash 2029</th>
-        <th>Cash 2030</th>
-        <th>Cash 2026-2030 (USD)</th>
+        <th>Cost {{ $year }} (USD)</th>
+        <th>Cost {{ $year + 1 }} (USD)</th>
+        <th>Cost {{ $year + 2 }} (USD)</th>
+        <th>Cost {{ $year + 3 }} (USD)</th>
+        <th>Cost {{ $year + 4 }} (USD)</th>
+        <th>Cost {{ $year }}-{{ $year + 4 }} (USD)</th>
+        <th>Cash {{ $year }} (USD)</th>
+        <th>Cash {{ $year + 1 }} (USD)</th>
+        <th>Cash {{ $year + 2 }} (USD)</th>
+        <th>Cash {{ $year + 3 }}</th>
+        <th>Cash {{ $year + 4 }}</th>
+        <th>Cash {{ $year }}-{{ $year + 4 }} (USD)</th>
 
         <!-- Monthly Forecast Cost 2025 -->
         <th>Jan-26 Cost</th>
@@ -127,18 +127,18 @@
             <td>{{ $budget['start_year'] ?? '-' }}</td>
             <td>{{ $budget['num_of_year_budget'] }}</td>
             <td>{{ $budget['fm_new'] }}</td>
-            <td>{{ $budget['cost_2026'] }}</td>
-            <td>{{ $budget['cost_2027'] }}</td>
-            <td>{{ $budget['cost_2028'] }}</td>
-            <td>{{ $budget['cost_2029'] }}</td>
-            <td>{{ $budget['cost_2030'] }}</td>
-            <td>{{ $budget['total_cost'] }}</td>
-            <td>{{ $budget['cash_2026'] }}</td>
-            <td>{{ $budget['cash_2027'] }}</td>
-            <td>{{ $budget['cash_2028'] }}</td>
-            <td>{{ $budget['cash_2029'] }}</td>
-            <td>{{ $budget['cash_2030'] }}</td>
-            <td>{{ $budget['total_cash'] }}</td>
+            <td>{{ $budget['cost_'.$year] ?? 0 }}</td>
+            <td>{{ $budget['cost_'.($year + 1)] ?? 0 }}</td>
+            <td>{{ $budget['cost_'.($year + 2)] ?? 0 }}</td>
+            <td>{{ $budget['cost_'.($year + 3)] ?? 0 }}</td>
+            <td>{{ $budget['cost_'.($year + 4)] ?? 0 }}</td>
+            <td>{{ $budget['total_cost'] ?? 0 }}</td>
+            <td>{{ $budget['cash_'.$year] ?? 0 }}</td>
+            <td>{{ $budget['cash_'.($year + 1)] ?? 0 }}</td>
+            <td>{{ $budget['cash_'.($year + 2)] ?? 0 }}</td>
+            <td>{{ $budget['cash_'.($year + 3)] ?? 0 }}</td>
+            <td>{{ $budget['cash_'.($year + 4)] ?? 0 }}</td>
+            <td>{{ $budget['total_cash'] ?? 0 }}</td>
 
             {{-- Placeholder for monthly cost and cash (2025 and 2026) --}}
             <td>-</td> {{-- Jan-25 --}}

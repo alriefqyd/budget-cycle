@@ -97,6 +97,11 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
             'cash_fourth' => $row[33] ?? "",
             'cash_fifth' => $row[34] ?? "",
             'cash_total' => $row[35] ?? "",
+            // Commitment only covers two years — the year before the cycle
+            // starts and the cycle's start year itself (matches the Show.jsx
+            // grid's commitment window).
+            'commitment_previous_year' => $row[36] ?? "",
+            'commitment_current_year' => $row[37] ?? "",
         ];
     }
 
@@ -122,7 +127,7 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
         $project = null;
         // Mark SAP code as imported
         $this->uniqueIdentifiers[] = $row['sap_code'];
-        if ($row['sap_code'] !== null && preg_match('/^C[1-9]/', $row['sap_code'])) {
+        if ($row['sap_code'] !== null && preg_match('/^C[0-9]/', $row['sap_code'])) {
             if ($this->isBudgetCycle) {
                 // Check if existing project within this budget cycle version
                 $project = Projects::firstOrNew([
@@ -197,6 +202,25 @@ class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchIns
                         'year' => $year,
                         'project_id' => $project->id,
                         'type' => 'cost',
+                    ],
+                    [
+                        'amount' => $amount,
+                    ]
+                );
+            }
+
+            /* COMMITMENT: previous year + current year of the cycle only */
+            $commitmentFields = [
+                $this->year - 1 => 'commitment_previous_year',
+                $this->year => 'commitment_current_year',
+            ];
+            foreach ($commitmentFields as $commitmentYear => $commitmentKey) {
+                $amount = is_numeric($row[$commitmentKey]) ? $row[$commitmentKey] : null;
+                CashCostYearly::updateOrCreate(
+                    [
+                        'year' => $commitmentYear,
+                        'project_id' => $project->id,
+                        'type' => 'commitment',
                     ],
                     [
                         'amount' => $amount,

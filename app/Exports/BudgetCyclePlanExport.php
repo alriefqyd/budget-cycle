@@ -18,16 +18,18 @@ class BudgetCyclePlanExport implements FromView, ShouldAutoSize, WithStyles
     * @return \Illuminate\Support\Collection
     */
 
-    public function __construct($data)
+    public function __construct($data, $year)
     {
         $this->data = $data;
         $this->size = count($data);
+        $this->year = (int) $year;
     }
 
     public function view(): View
     {
         return view('export.export_budget', [
-            'budgets' => $this->data
+            'budgets' => $this->data,
+            'year' => $this->year,
         ]);
     }
 
