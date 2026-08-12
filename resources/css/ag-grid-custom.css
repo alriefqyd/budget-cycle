@@ -139,6 +139,78 @@
     color: #7a4100;
 }
 
+/* Group header row (e.g. "Cost 2027-2031" / "Cash 2027-2031") sits directly
+   above its own light-green/light-amber child columns — same hue at the
+   same lightness made the two rows blend together, so the group row gets a
+   deliberately darker shade of its family instead of reusing the child
+   color. */
+/* Also used (via headerClass, not as a column group) on the "Cost Total" /
+   "Cash Total" leaf columns — those render through .ag-header-cell-label
+   instead of .ag-header-group-cell-label, so both selectors are covered
+   here rather than duplicating the color/weight rule per use site. */
+/* color set on the header cell itself (not just .ag-header-cell-label) so it
+   cascades via currentColor into PinnableHeader's filter/pin/hide icons too
+   — those are lucide-react SVGs rendered as siblings of the label, not
+   AG Grid's own .ag-icon font, so a rule scoped to just the label text
+   leaves them on their default dark color and unreadable on a dark header. */
+.custom-header-green-group {
+    background-color: #2f9e6e;
+    color: #ffffff;
+}
+.custom-header-green-group .ag-header-group-cell-label,
+.custom-header-green-group .ag-header-cell-label {
+    color: #ffffff;
+    font-weight: 800;
+}
+.custom-header-green-group .ag-icon,
+.custom-header-green-group .ag-header-icon {
+    color: #ffffff;
+    opacity: 0.9;
+}
+
+.custom-header-orange-group {
+    background-color: #d97706;
+    color: #ffffff;
+}
+.custom-header-orange-group .ag-header-group-cell-label,
+.custom-header-orange-group .ag-header-cell-label {
+    color: #ffffff;
+    font-weight: 800;
+}
+.custom-header-orange-group .ag-icon,
+.custom-header-orange-group .ag-header-icon {
+    color: #ffffff;
+    opacity: 0.9;
+}
+
+/* Cost Total / Cash Total cell values (down the whole column, not just the
+   header) — a light tint of the same family so the total figure is easy to
+   spot scanning down the grid, distinct from the plain-white per-year cells. */
+.total-cell-green {
+    background-color: #d7f7ea !important;
+    font-weight: 700 !important;
+}
+
+.total-cell-orange {
+    background-color: #ffe3c2 !important;
+    font-weight: 700 !important;
+}
+
+/* Same solid color as the dark Cost/Cash headers (custom-header-*-group),
+   used on the per-year + total cells beneath them so the whole column reads
+   as one continuous block instead of a dark header sitting over light cells. */
+.cell-dark-green {
+    background-color: #2f9e6e !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+.cell-dark-orange {
+    background-color: #d97706 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
 /* Cells */
 .ag-theme-alpine .ag-cell {
     font-size: 13px;

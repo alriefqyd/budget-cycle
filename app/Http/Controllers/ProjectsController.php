@@ -42,6 +42,16 @@ class ProjectsController extends Controller
     // look up the "before" value for each changed key.
     private static array $unloggedFields = ['id', 'created_at', 'updated_at', 'project_id', 'budget_cycle_period_id'];
 
+    // Find & Replace is scoped to plain text columns on `projects` only —
+    // never the cash/cost/commitment figures (those live on a different
+    // table with different upsert-by-year semantics, and "substring replace"
+    // isn't a meaningful operation on a number anyway).
+    private const FIND_REPLACE_FIELDS = [
+        'project_title', 'note', 'status_progress', 'project_manager', 'project_control',
+        'directorate', 'owner_area', 'type_of_investment', 'category',
+        'risk_residual', 'risk_forecast', 'fm_new',
+    ];
+
     // Returns the field => ['old' => ..., 'new' => ...] map of everything it
     // actually logged (post unloggedFields/no-op filtering), so callers can
     // reuse the exact same diff for an ActivityLog's `properties` instead of
@@ -340,6 +350,7 @@ class ProjectsController extends Controller
             ]);
             ActivityLog::record('project.created', "Added a new blank project row for {$request->year}", $data);
             $projectService->updateBudgetList($request->year);
+            $projectService->updateChart($request->year);
             return response()->json(['message' => 'Save Successful']);
         } catch (\Exception $e) {
             DB::rollback();
@@ -493,6 +504,103 @@ class ProjectsController extends Controller
         }
     }
 
+    // Excel-style "Find & Replace" across one text column, scoped to the
+    // exact (year, version) the grid has open — never across other versions.
+    // Same dry-run-then-confirm shape as uploadProject()'s import preview:
+    // callers should show the dry-run count/preview to the user before
+    // calling again with dry_run omitted.
+    public function findReplace(Request $request){
+        $validated = $request->validate([
+            'year' => 'required',
+            'version' => 'required',
+            'field' => 'required|string|in:' . implode(',', self::FIND_REPLACE_FIELDS),
+            'find' => 'required|string',
+            'replace' => 'nullable|string',
+        ]);
+        $field = $validated['field'];
+        $find = $validated['find'];
+        $replace = $validated['replace'] ?? '';
+        $matchCase = $request->boolean('match_case');
+        $dryRun = $request->boolean('dry_run');
+
+        try {
+            $budgetPeriod = BudgetCyclePeriod::where('start_year', $request->year)
+                ->where('version', $request->version)
+                ->firstOrFail();
+
+            $latestVersion = BudgetCyclePeriod::where('start_year', $request->year)->max('version');
+            if ((int) $budgetPeriod->version !== (int) $latestVersion) {
+                return response()->json(['message' => 'Cannot edit a locked (non-latest) budget cycle version.'], 423);
+            }
+            if ($budgetPeriod->approval_status === ApprovalStatus::FINAL->value) {
+                return response()->json(['message' => 'This budget cycle version is locked and can no longer be edited.'], 423);
+            }
+
+            $projects = Projects::where('budget_cycle_period_id', $budgetPeriod->id)
+                ->where($field, $matchCase ? 'LIKE BINARY' : 'LIKE', '%' . str_replace(['%', '_'], ['\\%', '\\_'], $find) . '%')
+                ->get();
+
+            $replaceIn = fn ($value) => $matchCase
+                ? str_replace($find, $replace, $value ?? '')
+                : str_ireplace($find, $replace, $value ?? '');
+
+            if ($dryRun) {
+                return response()->json([
+                    'dry_run' => true,
+                    'count' => $projects->count(),
+                    'preview' => $projects->take(10)->map(fn ($p) => [
+                        'sap_code' => $p->sap_code,
+                        'project_title' => $p->project_title,
+                        'before' => $p->$field,
+                        'after' => $replaceIn($p->$field),
+                    ]),
+                ]);
+            }
+
+            DB::beginTransaction();
+            $count = 0;
+            foreach ($projects as $project) {
+                $before = $project->$field;
+                $after = $replaceIn($before);
+                if ($after === $before) {
+                    continue;
+                }
+                $project->$field = $after;
+                $project->save();
+                ProjectChangeLog::create([
+                    'project_id' => $project->id,
+                    'user_id' => auth()->id(),
+                    'field' => $field,
+                    'old_value' => $before,
+                    'new_value' => $after,
+                ]);
+                $count++;
+            }
+
+            if ($count > 0) {
+                ActivityLog::record(
+                    'project.bulk_replaced',
+                    "Find & replace on {$field}: \"{$find}\" \u{2192} \"{$replace}\" across {$count} project(s) in {$request->year} v{$request->version}",
+                    $budgetPeriod,
+                    ['field' => $field, 'find' => $find, 'replace' => $replace, 'count' => $count]
+                );
+            }
+
+            DB::commit();
+
+            $projectService = new ProjectsService();
+            $projectService->updateBudgetList($request->year);
+
+            return response()->json([
+                'message' => "Replaced {$count} value(s).",
+                'count' => $count,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
     public function history($id)
     {
         $logs = ProjectChangeLog::where('project_id', $id)
@@ -532,6 +640,7 @@ class ProjectsController extends Controller
 
 
         $projectService->updateBudgetList($request->year);
+        $projectService->updateChart($request->year);
         return response()->json(['message' => 'Budgets deleted.']);
     }
 
@@ -693,6 +802,7 @@ class ProjectsController extends Controller
 
             $projectService = new ProjectsService();
             $projectService->updateBudgetList($year);
+            $projectService->updateChart($year);
 
             $remainingVersions = BudgetCyclePeriod::where('start_year', $year)->orderBy('version', 'desc')->get();
 

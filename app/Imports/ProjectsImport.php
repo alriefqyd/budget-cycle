@@ -14,6 +14,7 @@ use Maatwebsite\Excel\Concerns\RegistersEventListeners;
 use Maatwebsite\Excel\Concerns\RemembersRowNumber;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
+use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -21,8 +22,15 @@ use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Concerns\WithUpserts;
 use Maatwebsite\Excel\Events\AfterImport;
 
+// WithCalculatedFormulas: some source templates have formula cells (e.g. an
+// owner_area XLOOKUP against an external linked workbook) instead of plain
+// values. Without this, Laravel Excel reads the raw formula string
+// ("=_xlfn.XLOOKUP(...)") as the cell value. With it, PhpSpreadsheet tries to
+// calculate the formula and, when it can't (e.g. the external workbook isn't
+// loaded), falls back to the value Excel itself last cached for that cell —
+// see Cell::getValue() in vendor/maatwebsite/excel.
 class ProjectsImport implements ToModel, WithMapping, WithStartRow, WithBatchInserts,
-    WithUpserts, WithChunkReading, WithEvents
+    WithUpserts, WithChunkReading, WithEvents, WithCalculatedFormulas
 {
     /**
      * @param array $row

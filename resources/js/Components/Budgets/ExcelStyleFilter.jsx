@@ -12,7 +12,7 @@ import { useGridFilter } from "ag-grid-react";
 const BLANK_LABEL = "(Empty)";
 
 const ExcelStyleFilter = (props) => {
-    const { model, onModelChange, values = [], getValue } = props;
+    const { model, onModelChange, values = [], getValue, api } = props;
 
     const optionValues = useMemo(() => {
         const unique = new Set(values.map((v) => (v === null || v === undefined || v === '' ? BLANK_LABEL : v)));
@@ -47,7 +47,10 @@ const ExcelStyleFilter = (props) => {
         onModelChange(next.size === optionValues.length ? null : { values: Array.from(next) });
     };
 
-    const visibleOptions = optionValues.filter((v) => v.toLowerCase().includes(search.toLowerCase()));
+    // Values aren't guaranteed to be strings (e.g. the ID column is numeric) —
+    // String() guards .toLowerCase() the same way the sort above already
+    // guards .localeCompare().
+    const visibleOptions = optionValues.filter((v) => String(v).toLowerCase().includes(search.toLowerCase()));
     const allVisibleSelected = visibleOptions.length > 0 && visibleOptions.every((v) => selected.has(v));
 
     const toggleAllVisible = () => {
@@ -66,6 +69,19 @@ const ExcelStyleFilter = (props) => {
         applySelection(next);
     };
 
+    // Excel's own filter search narrows the checkbox list live as you type,
+    // but doesn't apply anything until you act on it — Enter is the fast
+    // path: narrow to whatever's currently matching and filter to just that,
+    // without needing to click each checkbox (or "Select All") by hand.
+    const applySearchAsFilter = () => {
+        if (!search || visibleOptions.length === 0) return;
+        applySelection(new Set(visibleOptions));
+        // Matches hitting "OK" in Excel's own filter dropdown — Enter both
+        // applies and closes it, instead of leaving the user to dismiss the
+        // popup themselves after they've already told it what they want.
+        api?.hidePopupMenu();
+    };
+
     return (
         <div className="w-64 p-2 font-body-sm text-body-sm" onKeyDown={(e) => e.stopPropagation()}>
             <input
@@ -74,6 +90,12 @@ const ExcelStyleFilter = (props) => {
                 placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applySearchAsFilter();
+                    }
+                }}
                 className="w-full px-2 py-1.5 mb-2 border border-outline-variant rounded-lg text-sm focus:ring-1 focus:ring-primary outline-none"
             />
             <label className="flex items-center gap-2 px-1 py-1 font-bold cursor-pointer border-b border-outline-variant pb-2 mb-1">

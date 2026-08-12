@@ -17,6 +17,7 @@ import {
     NumberEditorModule,
     TextEditorModule,
     SelectEditorModule,
+    CustomEditorModule,
     ClientSideRowModelApiModule,
     RenderApiModule,
     CellStyleModule,
@@ -38,6 +39,7 @@ import {Spinner} from "@/Components/Spinner.jsx";
 import Modal from "@/Components/Modal.jsx";
 import ProjectTrendChart from "@/Components/ProjectTrendChart.jsx";
 import PinnableHeader from "@/Components/Budgets/PinnableHeader.jsx";
+import AutocompleteCellEditor from "@/Components/Budgets/AutocompleteCellEditor.jsx";
 import ForecastsDashboard from "@/Components/Budgets/ForecastsDashboard.jsx";
 import ColumnVisibilityPanel, { TAB_CONTROLLED_FIELD } from "@/Components/Budgets/ColumnVisibilityPanel.jsx";
 
@@ -51,6 +53,7 @@ ModuleRegistry.registerModules([
     NumberEditorModule,
     TextEditorModule,
     SelectEditorModule,
+    CustomEditorModule,
     ClientSideRowModelApiModule,
     RenderApiModule,
     CellStyleModule,
@@ -162,6 +165,14 @@ const HISTORY_FIELD_LABELS = {
     cash_remaining: "Cash Remaining",
 };
 
+// Must match ProjectsController::FIND_REPLACE_FIELDS exactly — the backend
+// whitelist is the actual security boundary, this just drives the dropdown.
+const FIND_REPLACE_FIELDS = [
+    'project_title', 'note', 'status_progress', 'project_manager', 'project_control',
+    'directorate', 'owner_area', 'type_of_investment', 'category',
+    'risk_residual', 'risk_forecast', 'fm_new',
+];
+
 const formatHistoryValue = (value) => {
     if (value === null || value === undefined || value === '') return '—';
     if (typeof value === 'string' && value.trim() !== '' && !isNaN(Number(value))) {
@@ -181,6 +192,12 @@ export default function Show() {
     const [selectedRow, setSelectedRow] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showTrendModal, setShowTrendModal] = useState(false);
+    const [showFindReplace, setShowFindReplace] = useState(false);
+    const [findReplaceField, setFindReplaceField] = useState('project_title');
+    const [findText, setFindText] = useState('');
+    const [replaceText, setReplaceText] = useState('');
+    const [matchCase, setMatchCase] = useState(false);
+    const [findReplaceLoading, setFindReplaceLoading] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
 
     const pathParts = window.location.pathname.split('/');
@@ -420,18 +437,31 @@ export default function Show() {
                 );
             },
         },
-        { headerName: "SAP Code", field: "sap_code", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.sap_code) }, pinned:'left', width: 40, checkboxSelection: true,
+        // minWidth (not the old width: 40) — this is the only data column with
+        // headerCheckboxSelection, so its header has to fit a row-select
+        // checkbox *and* the filter/pin/hide icon row in the same space.
+        // 40 (even clamped up by defaultColDef's minWidth: 120) left the
+        // filter icon overlapping/clipped by the checkbox, so it looked
+        // unclickable — this is the one column that needs more room than the
+        // shared default.
+        { headerName: "SAP Code", field: "sap_code", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.sap_code) }, pinned:'left', minWidth: 150, checkboxSelection: true,
             headerCheckboxSelection: true},
-        { headerName: "Project's Title", field: "project_title", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.project_title) }, pinned:'left', width: 300},
-        { headerName: "Note", field: "note", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.note) } },
+        { headerName: "Project's Title", field: "project_title", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.project_title) }, pinned:'left', width: 300,
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.project_title) } },
+        { headerName: "Note", field: "note", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.note) },
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.note) } },
         { headerName: "Status", field: "status_progress", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.status_progress) }, cellEditor: 'agSelectCellEditor',cellEditorParams: {
                 values: ['ongoing', 'new', 'new bc'],
             }, cellRenderer: StatusBadgeRenderer },
         { headerName: "PM", field: "project_manager", filter: ExcelStyleFilter,
-            filterParams: { values: rowData.map(r => r.project_manager) }, minWidth: 220 },
-        { headerName: "PC", field: "project_control", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.project_control) }, minWidth: 150 },
-        { headerName: "Directorate", field: "directorate", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.directorate) }, minWidth: 75 },
-        { headerName: "Owner Area", field: "owner_area", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.owner_area) }, minWidth: 200 },
+            filterParams: { values: rowData.map(r => r.project_manager) }, minWidth: 220,
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.project_manager) } },
+        { headerName: "PC", field: "project_control", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.project_control) }, minWidth: 150,
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.project_control) } },
+        { headerName: "Directorate", field: "directorate", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.directorate) }, minWidth: 75,
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.directorate) } },
+        { headerName: "Owner Area", field: "owner_area", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.owner_area) }, minWidth: 200,
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.owner_area) } },
         { headerName: "Type of Investment", field: "type_of_investment", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.type_of_investment) }, minWidth:150, cellEditor: 'agSelectCellEditor',cellEditorParams: {
             values: ['True Sustaining', 'One-off'],
             } },
@@ -447,8 +477,10 @@ export default function Show() {
                 'Tailings, Dams and Piles',
             ],
             } },
-        { headerName: "Risk Residual", field: "risk_residual", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_residual) }, minWidth: 50,enableCellChangeFlash: false },
-        { headerName: "Risk Forecast", field: "risk_forecast", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_forecast) }, minWidth: 50,enableCellChangeFlash: false },
+        { headerName: "Risk Residual", field: "risk_residual", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_residual) }, minWidth: 50,enableCellChangeFlash: false,
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.risk_residual) } },
+        { headerName: "Risk Forecast", field: "risk_forecast", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.risk_forecast) }, minWidth: 50,enableCellChangeFlash: false,
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.risk_forecast) } },
         { headerName: "BC Budget", field: "bc_budget", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.bc_budget) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "Approved Budget", field: "budget_car", cellRenderer: "agAnimateShowChangeCellRenderer", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_car) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value) },
         { headerName: "CAR Status", field: "_car_variance", enableCellChangeFlash: false, editable: false, filter: false,
@@ -517,7 +549,8 @@ export default function Show() {
                 return { values };
             }
         },
-        { headerName: "Fund", field: "fm_new", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.fm_new) } },
+        { headerName: "Fund", field: "fm_new", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.fm_new) },
+            cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.fm_new) } },
         { headerName: "Top",  field: "top",  filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.top) }, minWidth:90, hide: !isTab2, cellEditor: "agSelectCellEditor", enableCellChangeFlash: false,
             cellEditorParams: (params) => {
                 const values = [];
@@ -560,7 +593,7 @@ export default function Show() {
             minWidth: 150,
             hide: hide,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-green',
+            headerClass:'custom-header-green-group',
             comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
         }
         );
@@ -587,14 +620,17 @@ export default function Show() {
     }
 
     columnDefs.push({
-            headerName: "Cost Total",
+            headerName: `Cost ${startYear}-${endYear}`,
             field: `total_cost`,
             filter: ExcelStyleFilter,
             filterParams: { values: rowData.map(r => r.total_cost) },
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-green',
+            // The 5-year sum is the figure that matters most in this block,
+            // so it gets called out instead of blending into the per-year columns.
+            headerClass:'custom-header-green-group',
+            cellClass: 'cell-dark-green',
             hide: activeTab === 'Tab1' ? false : true,
             comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
         },
@@ -606,6 +642,10 @@ export default function Show() {
             minWidth: 150,
             editable: false,
             headerClass:'custom-header-green',
+            // Base tint matches the rest of the Cost columns; cellClassRules
+            // below still wins (its colors are !important) when the value is
+            // negative, so the over-budget red warning is never hidden by this.
+            cellClass: 'total-cell-green',
             enableCellChangeFlash: false,
             hide: activeTab === 'Tab1' ? false : true,
             comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
@@ -641,7 +681,7 @@ export default function Show() {
             filterParams: { values: rowData.map(r => r[`cash_${year}`]) },
             minWidth: 150,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-orange',
+            headerClass:'custom-header-orange-group',
             comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
             hide: hide,
         });
@@ -669,14 +709,15 @@ export default function Show() {
 
     columnDefs.push(
         {
-            headerName: "Cash Total",
+            headerName: `Cash ${startYear}-${endYear}`,
             field: `total_cash`,
             filter: ExcelStyleFilter,
             filterParams: { values: rowData.map(r => r.total_cash) },
             minWidth: 150,
             editable:false,
             enableCellChangeFlash: false,
-            headerClass:'custom-header-orange',
+            headerClass:'custom-header-orange-group',
+            cellClass: 'cell-dark-orange',
             hide: activeTab === 'Tab1' ? false : true,
             comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
         },
@@ -689,6 +730,9 @@ export default function Show() {
             editable:false,
             enableCellChangeFlash: false,
             headerClass:'custom-header-orange',
+            // See Cost Remaining above — base tint matches the Cash columns,
+            // cellClassRules below still wins for negative values.
+            cellClass: 'total-cell-orange',
             hide: activeTab === 'Tab1' ? false : true,
             comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
             cellClassRules: {
@@ -865,6 +909,72 @@ export default function Show() {
             console.error("Failed to export", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Excel-style Find & Replace across one text column, scoped to the
+    // version currently open. Same dry-run-then-confirm shape as
+    // handleImport() above: preview the count before committing, since a
+    // careless "replace all" can silently touch far more rows than intended.
+    const handleFindReplace = async () => {
+        if (!findText) return;
+        setFindReplaceLoading(true);
+        const payload = {
+            year: startYear,
+            version: versionBudgetPeriod,
+            field: findReplaceField,
+            find: findText,
+            replace: replaceText,
+            match_case: matchCase,
+        };
+
+        let preview;
+        try {
+            const previewResponse = await axios.post('/budgets/find-replace', { ...payload, dry_run: 1 });
+            preview = previewResponse.data;
+        } catch (error) {
+            setFindReplaceLoading(false);
+            Swal.fire({ icon: 'error', title: 'Find & Replace Failed', text: error.response?.data?.message || 'Something went wrong' });
+            return;
+        }
+
+        if (preview.count === 0) {
+            setFindReplaceLoading(false);
+            Swal.fire({ icon: 'info', title: 'No matches', text: `No "${findReplaceField}" values contain "${findText}".`, timer: 2000, showConfirmButton: false });
+            return;
+        }
+
+        const examples = (preview.preview || [])
+            .map((row) => `${row.sap_code || row.project_title}: "${row.before}" → "${row.after}"`)
+            .join('\n');
+
+        const result = await Swal.fire({
+            title: `Replace ${preview.count} value(s)?`,
+            html: `<div style="text-align:left;white-space:pre-wrap;max-height:200px;overflow-y:auto;font-size:12px;">${examples}${preview.count > 10 ? `\n…and ${preview.count - 10} more` : ''}</div>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: `Yes, replace ${preview.count}`,
+        });
+
+        if (!result.isConfirmed) {
+            setFindReplaceLoading(false);
+            return;
+        }
+
+        try {
+            const response = await axios.post('/budgets/find-replace', payload);
+            const budgetByVersion = await getBudgetByVersion(versionBudgetPeriod);
+            setRowData(budgetByVersion.data.budgets);
+            Swal.fire({ icon: 'success', title: 'Done', text: response.data.message, timer: 2000, showConfirmButton: false });
+            setShowFindReplace(false);
+            setFindText('');
+            setReplaceText('');
+        } catch (error) {
+            Swal.fire({ icon: 'error', title: 'Find & Replace Failed', text: error.response?.data?.message || 'Something went wrong' });
+        } finally {
+            setFindReplaceLoading(false);
         }
     };
 
@@ -1847,6 +1957,15 @@ export default function Show() {
                                 )}
                                 {!isViewer && (
                                     <button
+                                        onClick={() => setShowFindReplace(true)}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px] opacity-70">find_replace</span>
+                                        Find &amp; Replace
+                                    </button>
+                                )}
+                                {!isViewer && (
+                                    <button
                                         onClick={handleExport}
                                         className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
                                     >
@@ -2117,6 +2236,75 @@ export default function Show() {
                 onSubmit={handleImport}
                 loading={loading}
             />
+
+            <Modal show={showFindReplace} onClose={() => { if (!findReplaceLoading) setShowFindReplace(false); }} maxWidth="md">
+                <div className="p-6 space-y-4">
+                    <h3 className="font-title-sm text-title-sm text-on-surface">Find &amp; Replace</h3>
+                    <p className="text-body-sm text-on-surface-variant">
+                        Replaces every occurrence of the text below within one column, across every project in this version. You'll see a preview before anything is saved.
+                    </p>
+
+                    <div>
+                        <label className="block text-sm font-medium text-on-surface-variant mb-1">Column</label>
+                        <select
+                            value={findReplaceField}
+                            onChange={(e) => setFindReplaceField(e.target.value)}
+                            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                        >
+                            {FIND_REPLACE_FIELDS.map((field) => (
+                                <option key={field} value={field}>{HISTORY_FIELD_LABELS[field] || field}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-on-surface-variant mb-1">Find</label>
+                        <input
+                            type="text"
+                            value={findText}
+                            onChange={(e) => setFindText(e.target.value)}
+                            autoFocus
+                            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-on-surface-variant mb-1">Replace with</label>
+                        <input
+                            type="text"
+                            value={replaceText}
+                            onChange={(e) => setReplaceText(e.target.value)}
+                            placeholder="(leave empty to remove the found text)"
+                            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                        />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer">
+                        <input type="checkbox" checked={matchCase} onChange={(e) => setMatchCase(e.target.checked)} />
+                        Match case
+                    </label>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowFindReplace(false)}
+                            disabled={findReplaceLoading}
+                            className="px-4 py-2 bg-surface-container text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container-high transition-all disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleFindReplace}
+                            disabled={findReplaceLoading || !findText}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all disabled:opacity-50"
+                        >
+                            {findReplaceLoading && <Spinner />}
+                            Find &amp; Replace
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal show={showTrendModal} onClose={() => setShowTrendModal(false)} maxWidth="6xl">
                 <ProjectTrendChart

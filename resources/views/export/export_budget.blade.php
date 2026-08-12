@@ -1,3 +1,22 @@
+@php
+    // Guards against a DB value that happens to start with a formula-trigger
+    // character (=, +, -, @) being written into the exported .xlsx as a real
+    // Excel formula instead of literal text. This isn't hypothetical: a past
+    // import bug left a handful of projects with literal
+    // "=_xlfn.XLOOKUP(...)" text stuck in directorate/owner_area, and
+    // PhpSpreadsheet's ShouldAutoSize column-width pass tries to *calculate*
+    // every formula cell it writes — for an XLOOKUP against an external
+    // workbook that isn't loaded, that calculation always fails and crashes
+    // the whole export with an uncaught exception. A leading apostrophe
+    // forces PhpSpreadsheet (and Excel, if the file is re-opened and edited)
+    // to treat the cell as plain text no matter what character follows.
+    $safe = function ($value) {
+        if (is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@'], true)) {
+            return "'" . $value;
+        }
+        return $value;
+    };
+@endphp
 <table border="1" cellspacing="0" cellpadding="5">
     <thead>
     <tr>
@@ -110,18 +129,18 @@
     @foreach($budgets as $budget)
         <tr>
             <td>{{ $budget['id'] }}</td>
-            <td>{{ $budget['sap_code'] }}</td>
-            <td>{{ $budget['project_title'] }}</td>
-            <td>{{ $budget['note'] }}</td>
-            <td>{{ $budget['status_progress'] }}</td>
-            <td>{{ $budget['project_manager'] }}</td>
-            <td>{{ $budget['project_control'] }}</td>
-            <td>{{ $budget['directorate'] }}</td>
-            <td>{{ $budget['owner_area'] }}</td>
-            <td>{{ $budget['type_of_investment'] }}</td>
-            <td>{{ $budget['category'] }}</td>
-            <td>{{ $budget['risk_residual'] }}</td>
-            <td>{{ $budget['risk_forecast'] }}</td>
+            <td>{{ $safe($budget['sap_code']) }}</td>
+            <td>{{ $safe($budget['project_title']) }}</td>
+            <td>{{ $safe($budget['note']) }}</td>
+            <td>{{ $safe($budget['status_progress']) }}</td>
+            <td>{{ $safe($budget['project_manager']) }}</td>
+            <td>{{ $safe($budget['project_control']) }}</td>
+            <td>{{ $safe($budget['directorate']) }}</td>
+            <td>{{ $safe($budget['owner_area']) }}</td>
+            <td>{{ $safe($budget['type_of_investment']) }}</td>
+            <td>{{ $safe($budget['category']) }}</td>
+            <td>{{ $safe($budget['risk_residual']) }}</td>
+            <td>{{ $safe($budget['risk_forecast']) }}</td>
             <td>{{ $budget['bc_budget'] }}</td>
             <td>{{ $budget['budget_car'] }}</td>
             <td>{{ $budget['actual_to_date_cost'] }}</td>
@@ -132,7 +151,7 @@
             <td>{{ $budget['budget_5yp'] }}</td>
             <td>{{ $budget['start_year'] ?? '-' }}</td>
             <td>{{ $budget['num_of_year_budget'] }}</td>
-            <td>{{ $budget['fm_new'] }}</td>
+            <td>{{ $safe($budget['fm_new']) }}</td>
             <td>{{ $budget['cost_'.$year] ?? 0 }}</td>
             <td>{{ $budget['cost_'.($year + 1)] ?? 0 }}</td>
             <td>{{ $budget['cost_'.($year + 2)] ?? 0 }}</td>

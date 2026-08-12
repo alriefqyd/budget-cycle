@@ -8,6 +8,7 @@ const ACTION_META = {
     'project.deleted': { label: 'Project Deleted', icon: 'delete', color: 'text-error' },
     'project.duplicated': { label: 'Project Duplicated', icon: 'content_copy', color: 'text-primary' },
     'project.imported': { label: 'Projects Imported', icon: 'upload_file', color: 'text-primary' },
+    'project.bulk_replaced': { label: 'Find & Replace', icon: 'find_replace', color: 'text-tertiary' },
     'budget.finalized': { label: 'Budget Finalized', icon: 'task_alt', color: 'text-tertiary' },
     'budget.locked': { label: 'Budget Locked', icon: 'lock', color: 'text-error' },
     'budget.version_deleted': { label: 'Version Deleted', icon: 'delete_sweep', color: 'text-error' },

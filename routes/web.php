@@ -36,6 +36,7 @@ Route::delete('/budgets-version/{year}/{version}', [\App\Http\Controllers\Projec
 Route::post('/budgets/', [\App\Http\Controllers\ProjectsController::class, 'store'])->middleware(['auth', 'role:editor'])->name('budget-create');
 Route::delete('/budgets', [\App\Http\Controllers\ProjectsController::class, 'destroy'])->middleware(['auth', 'role:editor'])->name('budget-delete');
 Route::post('/budgets/duplicate', [\App\Http\Controllers\ProjectsController::class, 'duplicate'])->middleware(['auth', 'role:editor'])->name('budget-duplicate');
+Route::post('/budgets/find-replace', [\App\Http\Controllers\ProjectsController::class, 'findReplace'])->middleware(['auth', 'role:editor'])->name('budget-find-replace');
 
 Route::middleware(['auth', 'role:editor'])->group(function () {
     Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
