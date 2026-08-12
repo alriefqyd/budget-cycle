@@ -381,7 +381,7 @@ export default function Show() {
     };
 
     const columnDefs = [
-        { headerName: "ID", field: "id", filter: 'agTextColumnFilter', pinned:'left', width: 40, hide:false,
+        { headerName: "ID", field: "id", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.id) }, pinned:'left', width: 40, hide:false,
             cellDataType: 'text',
             colSpan: params => params.node.rowPinned ? 3 : 1,
             cellStyle: params => params.node.rowPinned ? { textAlign: 'right', fontWeight: 700 } : null,
@@ -420,7 +420,7 @@ export default function Show() {
                 );
             },
         },
-        { headerName: "SAP Code", field: "sap_code", filter: 'agTextColumnFilter', pinned:'left', width: 40, checkboxSelection: true,
+        { headerName: "SAP Code", field: "sap_code", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.sap_code) }, pinned:'left', width: 40, checkboxSelection: true,
             headerCheckboxSelection: true},
         { headerName: "Project's Title", field: "project_title", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.project_title) }, pinned:'left', width: 300},
         { headerName: "Note", field: "note", filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.note) } },
@@ -732,7 +732,7 @@ export default function Show() {
     const defaultColDef = {
         resizable: true,
         sortable: true,
-        filter: true,
+        filter: ExcelStyleFilter,
         flex: 1,
         minWidth: 120,
         editable: true,
