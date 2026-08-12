@@ -171,7 +171,7 @@ export default function WaterfallComparison({dataChart, year}) {
                     <h3 className="font-title-sm text-title-sm text-on-surface">Budget by Owner Area</h3>
                     <div className="flex items-center gap-2 mt-1">
                         <span className="w-2 h-2 rounded-full bg-primary"></span>
-                        <p className="font-body-sm text-body-sm text-on-surface-variant">Cumulative budget contribution per owner area · in million</p>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">Cumulative cash budget contribution per owner area · in million</p>
                     </div>
                 </div>
                 {hasData && (

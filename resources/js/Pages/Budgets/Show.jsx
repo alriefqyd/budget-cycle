@@ -197,7 +197,6 @@ export default function Show() {
     const [deletingData, setDeletingData] = useState(false);
     const [deletingRowId, setDeletingRowId] = useState(null);
     const [deletingCount, setDeletingCount] = useState(0);
-    const [kpiTotals, setKpiTotals] = useState({ fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 });
     const [historyProject, setHistoryProject] = useState(null);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -233,27 +232,6 @@ export default function Show() {
         } finally {
             setHistoryLoading(false);
         }
-    };
-
-    // Summed from whatever's currently passing the grid's filters (not the
-    // full dataset), so the KPI row stays truthful to what's on screen — e.g.
-    // filtering the PM column narrows these totals down to that PM's projects.
-    const recomputeKpiTotals = () => {
-        const api = agGridRef.current?.api;
-        if (!api) return;
-        const totals = { fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 };
-        api.forEachNodeAfterFilter((node) => {
-            if (node.data?.sap_code === 'Total') return;
-            totals.fiveYpCash += parseNumber(node.data?.total_cash);
-            totals.fiveYpCost += parseNumber(node.data?.total_cost);
-            totals.yearCash += parseNumber(node.data?.[`cash_${startYear}`]);
-            totals.yearCost += parseNumber(node.data?.[`cost_${startYear}`]);
-            totals.actual += parseNumber(node.data?.actual_to_date);
-            totals.actualCost += parseNumber(node.data?.actual_to_date_cost);
-            totals.remaining += parseNumber(node.data?.budget_5yp);
-            totals.count += 1;
-        });
-        setKpiTotals(totals);
     };
 
     useEffect(() => {
@@ -746,16 +724,6 @@ export default function Show() {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         });
-    };
-
-    const formatCompactCurrency = (value) => {
-        const num = Number(value) || 0;
-        const sign = num < 0 ? '-' : '';
-        const abs = Math.abs(num);
-        if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`;
-        if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-        if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
-        return `${sign}$${abs.toFixed(0)}`;
     };
 
     const handleImport = async (data) => {
@@ -1413,7 +1381,6 @@ export default function Show() {
             }
 
             console.log(result.message);
-            recomputeKpiTotals();
             setSaveStatus('saved');
             saveStatusTimeout.current = setTimeout(() => setSaveStatus('idle'), 2500);
         } catch (error) {
@@ -1732,7 +1699,6 @@ export default function Show() {
     };
 
     const onFilterChangedCombined = (params) => {
-        recomputeKpiTotals();
         try {
             localStorage.setItem(FILTER_MODEL_STORAGE_KEY, JSON.stringify(params.api.getFilterModel()));
         } catch (e) {
@@ -1941,81 +1907,6 @@ export default function Show() {
                     </div>
                 </div>
 
-                {/* KPI summary — reflects whatever is currently passing the grid's filters */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-stack-sm">
-                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
-                        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-on-primary-container text-[16px]">account_balance_wallet</span>
-                        </div>
-                        <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Total 5YP Budget {startYear}-{endYear}</p>
-                            <p className="text-lg font-semibold text-on-surface truncate" title={`Cash: ${formatCurrency(kpiTotals.fiveYpCash)}`}>
-                                {formatCompactCurrency(kpiTotals.fiveYpCash)}
-                                <span className="text-body-sm font-normal text-on-surface-variant"> Cash</span>
-                            </p>
-                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Cost: ${formatCurrency(kpiTotals.fiveYpCost)}`}>
-                                {formatCompactCurrency(kpiTotals.fiveYpCost)} Cost
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
-                        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-on-primary-container text-[16px]">calendar_month</span>
-                        </div>
-                        <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Total Budget {startYear}</p>
-                            <p className="text-lg font-semibold text-on-surface truncate" title={`Cash: ${formatCurrency(kpiTotals.yearCash)}`}>
-                                {formatCompactCurrency(kpiTotals.yearCash)}
-                                <span className="text-body-sm font-normal text-on-surface-variant"> Cash</span>
-                            </p>
-                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Cost: ${formatCurrency(kpiTotals.yearCost)}`}>
-                                {formatCompactCurrency(kpiTotals.yearCost)} Cost
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
-                        <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-on-secondary-container text-[16px]">history</span>
-                        </div>
-                        <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Actual to Date</p>
-                            <p className="text-lg font-semibold text-on-surface truncate" title={`Cash: ${formatCurrency(kpiTotals.actual)}`}>
-                                {formatCompactCurrency(kpiTotals.actual)}
-                                <span className="text-body-sm font-normal text-on-surface-variant"> Cash</span>
-                            </p>
-                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Cost: ${formatCurrency(kpiTotals.actualCost)}`}>
-                                {formatCompactCurrency(kpiTotals.actualCost)} Cost
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${kpiTotals.remaining < 0 ? 'bg-error/15' : 'bg-tertiary-container'}`}>
-                            <span className={`material-symbols-outlined text-[16px] ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-tertiary-container'}`}>savings</span>
-                        </div>
-                        <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Remaining Forecast (Unused)</p>
-                            <p className={`text-lg font-semibold truncate ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-surface'}`} title={formatCurrency(kpiTotals.remaining)}>
-                                {formatCompactCurrency(kpiTotals.remaining)}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
-                        <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-on-surface-variant text-[16px]">folder_open</span>
-                        </div>
-                        <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Number of Projects</p>
-                            <p className="text-lg font-semibold text-on-surface truncate">
-                                {kpiTotals.count.toLocaleString('en-US')}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Tab Container */}
                 <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden border border-outline-variant">
                     <div className="flex items-center justify-between gap-6 px-container-padding border-b border-outline-variant bg-white">
@@ -2091,8 +1982,6 @@ export default function Show() {
                                 onGridReady={onGridReady}
                                 onColumnVisible={onColumnVisibleForStorage}
                                 onFilterChanged={onFilterChangedCombined}
-                                onFirstDataRendered={recomputeKpiTotals}
-                                onRowDataUpdated={recomputeKpiTotals}
                             />
                         </div>
                     )}

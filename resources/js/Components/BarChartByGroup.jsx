@@ -84,7 +84,7 @@ export default function BarChartByGroup({ dataChart, year, title = 'Project Cate
                     <div className="flex items-center gap-2 mt-1">
                         <span className="w-2 h-2 rounded-full bg-primary"></span>
                         <p className="font-body-sm text-body-sm text-on-surface-variant">
-                            {viewType === 'count' ? `Projects by ${noun}` : `Budget by ${noun} · in million`}
+                            {viewType === 'count' ? `Projects by ${noun}` : `Cash budget by ${noun} · in million`}
                         </p>
                     </div>
                 </div>

@@ -7,8 +7,6 @@ import { useState } from 'react';
 const baseNavItems = [
     { label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
     { label: 'Budgets', icon: 'account_balance_wallet', href: '/budgets' },
-    { label: 'Reports', icon: 'analytics' },
-    { label: 'Settings', icon: 'settings' },
 ];
 
 function getInitials(name) {
@@ -63,22 +61,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 </div>
                 <nav className="flex-1 px-4 space-y-2">
                     {navItems.map((item) => {
-                        const active = item.href && currentPath.startsWith(item.href);
-
-                        if (!item.href) {
-                            return (
-                                <span
-                                    key={item.label}
-                                    className={`flex items-center gap-3 px-4 py-3 text-on-surface-variant/40 rounded-lg cursor-not-allowed ${
-                                        collapsed ? 'justify-center px-0' : ''
-                                    }`}
-                                    title="Coming soon"
-                                >
-                                    <span className="material-symbols-outlined">{item.icon}</span>
-                                    {!collapsed && <span className="font-label-caps text-label-caps">{item.label}</span>}
-                                </span>
-                            );
-                        }
+                        const active = currentPath.startsWith(item.href);
 
                         return (
                             <Link
