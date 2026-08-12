@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.jsx";
 
@@ -27,8 +28,37 @@ function formatValue(value) {
     return String(value);
 }
 
+function formatDayHeading(value) {
+    return new Date(value).toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+}
+
+// Rows arrive already ordered by created_at desc from the server, so a
+// single pass groups same-day rows into contiguous buckets without
+// re-sorting. Grouping happens per page (not across the whole filtered
+// result set) — consistent with how the rest of this page is paginated.
+function groupByDay(logs) {
+    const groups = [];
+    for (const log of logs) {
+        const dayKey = new Date(log.created_at).toDateString();
+        const lastGroup = groups[groups.length - 1];
+        if (lastGroup && lastGroup.key === dayKey) {
+            lastGroup.logs.push(log);
+        } else {
+            groups.push({ key: dayKey, heading: formatDayHeading(log.created_at), logs: [log] });
+        }
+    }
+    return groups;
+}
+
 export default function ActivityLogsIndex() {
     const { logs, users, actions, filters } = usePage().props;
+    const dayGroups = groupByDay(logs.data);
+    const hasActiveFilters = filters.user_id || filters.action || filters.date_from || filters.date_to;
 
     const applyFilter = (key, value) => {
         router.get(route('activity-logs.index'), { ...filters, [key]: value || undefined }, {
@@ -78,7 +108,23 @@ export default function ActivityLogsIndex() {
                             <option key={a} value={a}>{ACTION_META[a]?.label ?? a}</option>
                         ))}
                     </select>
-                    {(filters.user_id || filters.action) && (
+                    <div className="flex items-center gap-2 border border-outline-variant rounded-lg px-3 py-2 bg-surface-container-lowest">
+                        <span className="text-xs text-on-surface-variant">From</span>
+                        <input
+                            type="date"
+                            value={filters.date_from ?? ''}
+                            onChange={(e) => applyFilter('date_from', e.target.value)}
+                            className="border-none p-0 text-sm bg-transparent focus:ring-0"
+                        />
+                        <span className="text-xs text-on-surface-variant">to</span>
+                        <input
+                            type="date"
+                            value={filters.date_to ?? ''}
+                            onChange={(e) => applyFilter('date_to', e.target.value)}
+                            className="border-none p-0 text-sm bg-transparent focus:ring-0"
+                        />
+                    </div>
+                    {hasActiveFilters && (
                         <button
                             onClick={() => router.get(route('activity-logs.index'), {}, { preserveState: true, preserveScroll: true, replace: true })}
                             className="text-sm text-on-surface-variant hover:text-primary underline"
@@ -106,40 +152,49 @@ export default function ActivityLogsIndex() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-outline-variant/30">
-                                {logs.data.map(log => {
-                                    const meta = ACTION_META[log.action] ?? { label: log.action, icon: 'info', color: 'text-on-surface-variant' };
-                                    return (
-                                        <tr key={log.id} className="hover:bg-primary-container/5">
-                                            <td className="px-6 py-4 text-on-surface-variant text-sm whitespace-nowrap">
-                                                {formatDateTime(log.created_at)}
-                                            </td>
-                                            <td className="px-6 py-4 font-medium text-on-surface whitespace-nowrap">
-                                                {log.user?.name ?? 'Unknown user'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${meta.color}`}>
-                                                    <span className="material-symbols-outlined text-[16px]">{meta.icon}</span>
-                                                    {meta.label}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-on-surface-variant text-sm">
-                                                {log.description}
-                                                {log.properties && Object.keys(log.properties).length > 0 && (
-                                                    <ul className="mt-1.5 space-y-0.5 border-l-2 border-outline-variant pl-2.5">
-                                                        {Object.entries(log.properties).map(([field, diff]) => (
-                                                            <li key={field} className="text-xs text-on-surface-variant/80">
-                                                                <span className="font-mono">{field}</span>:{' '}
-                                                                <span className="line-through decoration-error/60">{formatValue(diff.old)}</span>
-                                                                {' → '}
-                                                                <span className="font-medium text-on-surface">{formatValue(diff.new)}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
+                                {dayGroups.map(group => (
+                                    <Fragment key={group.key}>
+                                        <tr className="bg-surface-container-low">
+                                            <td colSpan={4} className="px-6 py-2 text-xs font-label-caps uppercase tracking-wide text-on-surface-variant sticky top-0">
+                                                {group.heading} <span className="text-on-surface-variant/60 normal-case">· {group.logs.length} activit{group.logs.length !== 1 ? 'ies' : 'y'}</span>
                                             </td>
                                         </tr>
-                                    );
-                                })}
+                                        {group.logs.map(log => {
+                                            const meta = ACTION_META[log.action] ?? { label: log.action, icon: 'info', color: 'text-on-surface-variant' };
+                                            return (
+                                                <tr key={log.id} className="hover:bg-primary-container/5">
+                                                    <td className="px-6 py-4 text-on-surface-variant text-sm whitespace-nowrap">
+                                                        {formatDateTime(log.created_at)}
+                                                    </td>
+                                                    <td className="px-6 py-4 font-medium text-on-surface whitespace-nowrap">
+                                                        {log.user?.name ?? 'Unknown user'}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${meta.color}`}>
+                                                            <span className="material-symbols-outlined text-[16px]">{meta.icon}</span>
+                                                            {meta.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-on-surface-variant text-sm">
+                                                        {log.description}
+                                                        {log.properties && Object.keys(log.properties).length > 0 && (
+                                                            <ul className="mt-1.5 space-y-0.5 border-l-2 border-outline-variant pl-2.5">
+                                                                {Object.entries(log.properties).map(([field, diff]) => (
+                                                                    <li key={field} className="text-xs text-on-surface-variant/80">
+                                                                        <span className="font-mono">{field}</span>:{' '}
+                                                                        <span className="line-through decoration-error/60">{formatValue(diff.old)}</span>
+                                                                        {' → '}
+                                                                        <span className="font-medium text-on-surface">{formatValue(diff.new)}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </Fragment>
+                                ))}
                                 {logs.data.length === 0 && (
                                     <tr>
                                         <td colSpan={4} className="px-6 py-10 text-center text-on-surface-variant">
