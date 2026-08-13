@@ -10,6 +10,7 @@ use App\Imports\MaterialCategoryImport;
 use App\Imports\MaterialImport;
 use App\Imports\ProjectsImport;
 use App\Models\ActivityLog;
+use App\Models\BudgetAutoExport;
 use App\Models\BudgetCyclePeriod;
 use App\Models\BudgetSetting;
 use App\Models\CashCostMonthly;
@@ -20,6 +21,7 @@ use App\Services\ProjectsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -128,6 +130,21 @@ class ProjectsController extends Controller
             $projectService = new ProjectsService();
             $budgetCycle = $projectService->saveBudgetCyclePeriod($request, ApprovalStatus::APPROVED);
             $data = $projectService->saveProject($request, $budgetCycle);
+
+            // Every other creation path (duplicate(), the Excel import) also
+            // creates the budget_settings row and one cash_cost_yearlies row
+            // per year — without these, this brand-new project has zero
+            // CashCostYearly rows until its *second* save (the first edit
+            // after this one, which goes through update()'s upsert loop
+            // instead). In that window, anything that reads the project back
+            // (e.g. the realtime broadcast fired below) sees every
+            // cash_YYYY/cost_YYYY field as entirely absent rather than 0,
+            // which is the kind of gap that makes a value look like it
+            // "disappeared" the moment that broadcast reaches another tab.
+            $requestData = (object) $request->all();
+            $projectService->saveBudget($data, $requestData);
+            $projectService->saveCashCostYearly($data, $requestData);
+
             ActivityLog::record('project.created', "Created project \"{$data->project_title}\" ({$data->sap_code}) for {$data->year_period}", $data);
 
             DB::commit();
@@ -236,6 +253,14 @@ class ProjectsController extends Controller
         try {
             $projectService = new ProjectsService;
             $budgets = $projectService->getBudgetsByYear($request->year, null);
+
+            ActivityLog::record(
+                'budget.exported',
+                "Exported budget cycle data for {$request->year}",
+                null,
+                ['year' => $request->year]
+            );
+
             return Excel::download(new BudgetCyclePlanExport($budgets, $request->year), 'Budget-Cycle-'.$request->year.'.xlsx');
         } catch (Exception $e) {
             return response()->json([
@@ -243,6 +268,57 @@ class ProjectsController extends Controller
                 'message' => $e->getMessage(),
             ]);
         }
+    }
+
+    // `enabled`/`interval_minutes` toggle whether app/Console/Commands/RunAutoExports
+    // (scheduled every minute — see bootstrap/app.php) generates a fresh backup
+    // of this specific (year, version) on a timer, independent of anyone
+    // manually clicking "Export Data".
+    public function updateAutoExportSettings(Request $request, $year, $version){
+        $request->validate([
+            'enabled' => 'required|boolean',
+            'interval_minutes' => 'nullable|integer|in:15,30,60,120',
+        ]);
+
+        $period = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
+        $period->auto_export_enabled = $request->boolean('enabled');
+        if ($request->filled('interval_minutes')) {
+            $period->auto_export_interval_minutes = $request->interval_minutes;
+        }
+        $period->save();
+
+        ActivityLog::record(
+            $period->auto_export_enabled ? 'budget.auto_export_enabled' : 'budget.auto_export_disabled',
+            ($period->auto_export_enabled ? 'Enabled' : 'Disabled') . " auto-backup for {$year} v{$version}"
+                . ($period->auto_export_enabled ? " every {$period->auto_export_interval_minutes} minutes" : ''),
+            $period
+        );
+
+        return response()->json([
+            'success' => true,
+            'auto_export_enabled' => $period->auto_export_enabled,
+            'auto_export_interval_minutes' => $period->auto_export_interval_minutes,
+        ]);
+    }
+
+    public function listAutoExports($year, $version){
+        $period = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
+        $files = $period->autoExports()->orderByDesc('id')->get(['id', 'file_size', 'created_at']);
+
+        return response()->json([
+            'auto_export_enabled' => $period->auto_export_enabled,
+            'auto_export_interval_minutes' => $period->auto_export_interval_minutes,
+            'data' => $files,
+        ]);
+    }
+
+    // Looks up the stored file by its own numeric id (not a raw filename) so
+    // there's no path-traversal surface on this endpoint.
+    public function downloadAutoExport($year, $version, $exportId){
+        $period = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
+        $export = $period->autoExports()->findOrFail($exportId);
+
+        return Storage::disk('local')->download($export->disk_path, basename($export->disk_path));
     }
 
     public function uploadProject(Request $request){
@@ -374,14 +450,29 @@ class ProjectsController extends Controller
                     'data' => false
                 ], 423);
             }
+            // `changed_fields`, when the client sends it, restricts this
+            // save to only that subset of the payload. The grid always
+            // sends a full snapshot of the row (some of the code below
+            // still needs it, e.g. year_period), but that snapshot can be
+            // slightly stale by the time it lands here — without this
+            // restriction, editing one field would blindly resend and
+            // reapply every other field's last-known value too, silently
+            // overwriting a change another user made in between. Callers
+            // that intentionally want a full resync (the manual "Save All"
+            // safety net) simply omit it, keeping the previous behavior.
+            $changedFields = $request->input('changed_fields');
+            $fieldsToApply = is_array($changedFields)
+                ? collect($request->all())->only($changedFields)->toArray()
+                : $request->all();
+
             $projectOriginal = $project->getOriginal();
-            $project->update($request->all());
+            $project->update($fieldsToApply);
 
             $budget = $project->budgets;
             $budgetOriginal = [];
             if($budget){
                 $budgetOriginal = $budget->getOriginal();
-                $budget->update($request->all());
+                $budget->update($fieldsToApply);
             } else {
                 $project->budgets()->create([
                     'budget_cost' => $request->budget_cost,
@@ -415,7 +506,7 @@ class ProjectsController extends Controller
             $yearlyOriginal = [];
             $yearlyChanges = [];
 
-            foreach ($request->all() as $key => $value) {
+            foreach ($fieldsToApply as $key => $value) {
                 if (preg_match('/^(cash|cost|commitment)_(\d{4})$/', $key, $matches)) {
                     $type = $matches[1]; // 'cash', 'cost', or 'commitment'
                     $year = $matches[2]; // e.g. '2025'
@@ -711,6 +802,8 @@ class ProjectsController extends Controller
                 'budgets' => $budgets,
                 'latestVersion' => $latestVersion,
                 'approvalStatus' => $currentPeriod->approval_status ?? null,
+                'autoExportEnabled' => $currentPeriod->auto_export_enabled ?? false,
+                'autoExportIntervalMinutes' => $currentPeriod->auto_export_interval_minutes ?? null,
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);

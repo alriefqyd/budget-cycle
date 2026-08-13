@@ -1,0 +1,197 @@
+====================================================================
+DEPLOY GUIDE — feature/new-version -> production
+Generated 2026-08-13
+====================================================================
+
+WHAT'S IN THIS PUSH (why each server step below is needed)
+--------------------------------------------------------------
+1. Auto Backup feature (new)
+   - 2 new migrations:
+       2026_08_12_000000_add_auto_export_to_budget_cycle_periods_table
+       2026_08_12_000001_create_budget_auto_exports_table
+   - New model: app/Models/BudgetAutoExport.php
+   - New console command: app/Console/Commands/RunAutoExports.php
+     (signature: exports:run-auto)
+   - New scheduled job in bootstrap/app.php: runs exports:run-auto
+     every minute. This ONLY fires if something on the server calls
+     `php artisan schedule:run` every minute (see STEP 4 below) --
+     the withSchedule() block alone does nothing by itself.
+   - Writes .xlsx files to storage/app/private/auto_exports/... via
+     the "local" disk. Self-prunes to the last 20 files per budget
+     period, but the storage path must exist and be writable.
+
+2. Concurrency fix on project saves (PUT /budgets/{id}) -- code only,
+   no server action needed.
+
+3. New-project fix in store() -- code only, no server action needed.
+
+4. Activity log: two new action strings now recorded
+   (budget.exported, budget.auto_export_enabled/disabled) -- no
+   migration needed, `action` is a plain varchar column. No server
+   action needed.
+
+5. Frontend-only changes (column reorder, conditional formatting,
+   info-icon formula popups on Budgets Show) -- covered by the
+   normal `npm run build` step below, no separate action.
+
+====================================================================
+STANDARD DEPLOY STEPS
+====================================================================
+
+STEP 0 -- Back up before touching anything
+--------------------------------------------------------------
+  - Take a DB snapshot/backup (this push includes schema changes).
+  - Note current git commit on the server (`git rev-parse HEAD`) in
+    case you need to roll back.
+
+STEP 1 -- Pull code & install dependencies
+--------------------------------------------------------------
+  cd /path/to/app
+  php artisan down --render="errors::503" --retry=60   # maintenance mode
+  git pull origin main            # or whatever branch prod deploys from
+  composer install --no-dev --optimize-autoloader
+  npm ci
+  npm run build                   # builds resources/js -> public/build
+
+STEP 2 -- Run the new migrations
+--------------------------------------------------------------
+  php artisan migrate --force
+
+  This adds:
+    - budget_cycle_periods.auto_export_enabled (bool, default false)
+    - budget_cycle_periods.auto_export_interval_minutes (nullable int)
+    - budget_cycle_periods.auto_export_last_run_at (nullable timestamp)
+    - new table budget_auto_exports
+
+  Nothing is backfilled -- existing periods simply start with Auto
+  Backup off, which is the safe/expected default.
+
+STEP 3 -- Storage permissions
+--------------------------------------------------------------
+  Make sure the web server user can write to:
+    storage/app/private/auto_exports/
+
+  It doesn't need to exist ahead of time (Storage::store() creates
+  the directory tree on first write), but the PARENT
+  storage/app/private/ must be writable by whatever user runs
+  php-fpm / the queue worker / the scheduler.
+
+  php artisan storage:link   # only if not already linked; harmless if already done
+
+STEP 4 -- Wire up the scheduler (REQUIRED for Auto Backup to ever run)
+--------------------------------------------------------------
+  bootstrap/app.php now schedules `exports:run-auto` every minute.
+  Laravel's scheduler does nothing on its own -- something on the
+  server must invoke `php artisan schedule:run` once a minute.
+
+  If prod already has a Laravel cron entry (most Laravel apps do,
+  for other scheduled tasks), you're already done -- skip this step.
+  Check first:
+      crontab -l | grep schedule:run
+
+  If there's NO existing entry, add one:
+      * * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1
+
+  If prod deploys via docker-compose (mirroring local dev), the
+  `scheduler` service added to docker-compose.yml in this push
+  handles this automatically once you redeploy the compose file --
+  no manual cron needed in that case. Confirm the service is up:
+      docker compose ps scheduler
+
+STEP 5 -- *** IMPORTANT: queue worker gap found during this session ***
+--------------------------------------------------------------
+  Unrelated to this specific push, but discovered while debugging a
+  "realtime updates don't work" report: QUEUE_CONNECTION=database is
+  set, and TWO of the three realtime broadcast events
+  (BudgetUpdated, BudgetListUpdated) are declared ShouldBroadcast,
+  which means they are QUEUED, not sent immediately.
+
+  If there is no `php artisan queue:work` (or queue:listen) process
+  running on production the same way there wasn't one in local dev,
+  these two broadcasts have never actually been delivered -- they
+  just accumulate forever in the `jobs` table and silently expire
+  into `failed_jobs`. (DashboardUpdated is unaffected -- it uses
+  ShouldBroadcastNow and bypasses the queue entirely.)
+
+  Check for a backlog on the production DB:
+      php artisan tinker --execute="echo DB::table('jobs')->count();"
+
+  If that number is large / growing, there is no queue worker
+  running. Options:
+    a) Add a supervisor/systemd unit running:
+         php artisan queue:work --tries=3 --sleep=3
+       (restart it on deploy: `php artisan queue:restart` picks up
+       new code without a hard process restart, but do a real
+       restart too if the unit isn't already watching for that.)
+    b) Or switch QUEUE_CONNECTION=sync in .env if near-real-time
+       delivery on every request is acceptable (simplest fix, but
+       makes every save a little slower since the broadcast now runs
+       inline instead of in the background).
+  This is a pre-existing gap, not something newly broken by this
+  push -- but worth fixing at the same time since you're already
+  touching broadcast-related code in this release.
+
+STEP 6 -- Clear & rebuild caches
+--------------------------------------------------------------
+  php artisan config:clear
+  php artisan config:cache
+  php artisan route:clear
+  php artisan route:cache
+  php artisan view:clear
+  php artisan view:cache
+  php artisan event:clear      # only if using event:cache elsewhere
+
+STEP 7 -- Restart long-running processes
+--------------------------------------------------------------
+  - Restart php-fpm (or whatever serves PHP) so opcache picks up
+    the new code:
+        sudo systemctl restart php8.2-fpm     # adjust for your setup
+  - Restart the queue worker (if one exists / was just added in
+    STEP 5):
+        php artisan queue:restart
+        sudo systemctl restart <your-queue-worker-unit>
+  - If using docker-compose in prod, instead:
+        docker compose up -d --build
+
+STEP 8 -- Bring the app back up
+--------------------------------------------------------------
+  php artisan up
+
+====================================================================
+POST-DEPLOY VERIFICATION CHECKLIST
+====================================================================
+  [ ] Site loads, login works
+  [ ] /budgets/{year} grid loads, a cell edit saves successfully
+  [ ] New "Commitment" columns appear next to "Budget Year" (not at
+      the far right)
+  [ ] "Available Budget 5YP" columns show red/green shading
+  [ ] Info (i) icons appear on computed columns and their popup
+      shows a formula, not clipped
+  [ ] Open the "Actions" menu on a budget -> "Auto Backup" -> toggle
+      it on for one test period, confirm the setting persists
+  [ ] After ~1 minute (or the chosen interval), confirm a file
+      appears under storage/app/private/auto_exports/... and a row
+      is created in budget_auto_exports (check via tinker or the
+      Auto Backup modal's file list)
+  [ ] Activity Log page shows a "Budget Exported" entry after using
+      the manual Export Data button, and "Auto Backup Enabled"
+      after the toggle test above
+  [ ] (If STEP 5 was addressed) confirm `jobs` table backlog is
+      draining: php artisan tinker --execute="echo DB::table('jobs')->count();"
+  [ ] Open two browser tabs on the same budget year, edit in one,
+      confirm the other tab's row updates live (tests BudgetUpdated
+      delivery -- will fail here if STEP 5 wasn't addressed)
+
+====================================================================
+ROLLBACK NOTES
+====================================================================
+  - Migrations are reversible: `php artisan migrate:rollback --step=2`
+    drops budget_auto_exports and removes the 3 new columns on
+    budget_cycle_periods. Safe to run -- nothing else depends on
+    these yet.
+  - If you added a queue worker in STEP 5 and need to roll back the
+    whole release, it's fine to leave the worker running -- it has
+    nothing queue-specific to this release to process incorrectly.
+  - Revert docker-compose.yml's `scheduler` service (or the cron
+    entry from STEP 4) if you want to fully undo the Auto Backup
+    feature's server footprint, not just the code.

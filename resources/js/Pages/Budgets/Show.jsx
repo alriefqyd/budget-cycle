@@ -183,7 +183,25 @@ const formatHistoryValue = (value) => {
 
 export default function Show() {
     const gridRef = useRef();
-    const lastUpdatedId = useRef(null);
+    // Self-echo suppression for the realtime .budgets.update listener below —
+    // a Set (not a single id) because "edit rapidly" means saves for several
+    // *different* rows can be in flight at once; a single-value ref would
+    // only remember the most recent one and start letting earlier rows'
+    // own broadcasts through as if they came from someone else. Each id
+    // also gets a timed fallback removal in case its broadcast never
+    // arrives (e.g. Pusher hiccup), so a row can't get stuck permanently
+    // ignoring real updates from other users.
+    const recentlySavedIds = useRef(new Set());
+    // In-flight "create" locks for brand-new rows, keyed by the row's own
+    // data object reference (new rows have no id yet to key by). A plain
+    // debounce timer isn't enough here: once the timer *fires* it's no
+    // longer "pending" even though the POST it kicked off is still in
+    // flight, so an edit arriving during that window would see no pending
+    // timer and schedule its own — creating a duplicate project. The lock
+    // spans the debounce delay *and* the request, and any edit that arrives
+    // while it's held awaits the same promise instead of starting a new
+    // request. See onCellValueChanged's isNew branch.
+    const pendingCreateLocks = useRef(new Map());
     const { projects, year, budgets, versions, budgetVersion, auth} = usePage().props
     const isViewer = auth.user.role === 'viewer';
     const [activeTab, setActiveTab] = useState('Tab1');
@@ -198,6 +216,12 @@ export default function Show() {
     const [replaceText, setReplaceText] = useState('');
     const [matchCase, setMatchCase] = useState(false);
     const [findReplaceLoading, setFindReplaceLoading] = useState(false);
+    const [showAutoExport, setShowAutoExport] = useState(false);
+    const [autoExportEnabled, setAutoExportEnabled] = useState(!!budgetVersion.auto_export_enabled);
+    const [autoExportInterval, setAutoExportInterval] = useState(budgetVersion.auto_export_interval_minutes || 15);
+    const [autoExportSaving, setAutoExportSaving] = useState(false);
+    const [autoExportFiles, setAutoExportFiles] = useState([]);
+    const [autoExportFilesLoading, setAutoExportFilesLoading] = useState(false);
     const [loading, setLoading] = useState(false);  // <-- loading state
 
     const pathParts = window.location.pathname.split('/');
@@ -284,8 +308,8 @@ export default function Show() {
                 const agGridApi = agGridRef.current.api;
                 if (!agGridApi || !updatedRow?.id) return;
 
-                if (updatedRow.id === lastUpdatedId.current) {
-                    lastUpdatedId.current = null; // clear it
+                if (recentlySavedIds.current.has(updatedRow.id)) {
+                    recentlySavedIds.current.delete(updatedRow.id);
                     return;
                 }
 
@@ -298,7 +322,21 @@ export default function Show() {
                     }));
                     agGridApi.applyTransaction({ add: [updatedRow], addIndex: 0 });
                 } else {
-                    rowNode.setData(updatedRow);
+                    // Merge, not replace: the broadcast payload only includes
+                    // cash_YYYY/cost_YYYY/commitment_YYYY keys for years that
+                    // currently have a CashCostYearly row in the DB — a brand
+                    // new project (saved via the "+" button, before its first
+                    // full edit round-trips) or any other edge case with
+                    // incomplete yearly rows would omit some of those keys
+                    // entirely. A bare setData(updatedRow) replaces the whole
+                    // row object, so any field missing from the broadcast
+                    // silently becomes undefined — a value the user can see
+                    // on their screen "disappearing" the moment a broadcast
+                    // for that row arrives, even though nothing was actually
+                    // lost server-side. Spreading the existing local data
+                    // first means only fields *present* in the broadcast can
+                    // overwrite anything.
+                    rowNode.setData({ ...rowNode.data, ...updatedRow });
                     agGridApi.flashCells({
                         rowNodes: [rowNode],
                         columns: Object.keys(updatedRow),
@@ -315,6 +353,15 @@ export default function Show() {
                     if (pinnedRow) {
                         pinnedRow.setData(updatedTotals[0]);
                     }
+
+                    // rowNode.setData() only fires AG Grid's internal
+                    // "rowNodeDataChanged" event, not "rowDataUpdated" — so
+                    // the onRowDataUpdated={recomputeKpiTotals} grid prop
+                    // never fires for it. Without this, the KPI cards would
+                    // silently keep showing stale totals after another
+                    // user's live edit to an already-loaded row, even though
+                    // the grid and the pinned Total row both just updated.
+                    recomputeKpiTotals();
                 }
             });
 
@@ -487,6 +534,7 @@ export default function Show() {
             minWidth: 150, sortable: true,
             valueGetter: params => getCarVariance(params.data).pct,
             cellRenderer: CarVarianceRenderer,
+            headerComponentParams: { formula: '(Actual to Date + Forecast Cash) ÷ Approved Budget (CAR) × 100%. Over CAR when > 100%, Near Limit when ≥ 90%.' },
         },
         {
             headerName: `Actual Up to ${currentYear - 1}`,
@@ -522,8 +570,20 @@ export default function Show() {
             headerName: 'Available Budget 5YP',
             headerClass: 'custom-header-red',
             children: [
-                { headerName: "Cost", field: "budget_5yp_cost", headerClass: 'custom-header-red', enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp_cost) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)},
-                { headerName: "Cash", field: "budget_5yp", headerClass: 'custom-header-red', enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)},
+                { headerName: "Cost", field: "budget_5yp_cost", headerClass: 'custom-header-red', enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp_cost) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
+                    cellClassRules: {
+                        'negative-value': params => params.value < 0,
+                        'positive-value': params => params.value >= 0
+                    },
+                    headerComponentParams: { formula: 'Approved Budget (CAR) − Actual Cost to Date − A/F Cost' },
+                },
+                { headerName: "Cash", field: "budget_5yp", headerClass: 'custom-header-red', enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.budget_5yp) }, minWidth: 150, comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
+                    cellClassRules: {
+                        'negative-value': params => params.value < 0,
+                        'positive-value': params => params.value >= 0
+                    },
+                    headerComponentParams: { formula: 'Approved Budget (CAR) − Actual Cash to Date − A/F Cash' },
+                },
             ]
         },
 
@@ -549,6 +609,17 @@ export default function Show() {
                 return { values };
             }
         },
+        ...[startYear - 1, startYear].map(year => ({
+            headerName: `Commitment - ${year}`,
+            field: `commitment_${year}`,
+            filter: ExcelStyleFilter,
+            filterParams: { values: rowData.map(r => r[`commitment_${year}`]) },
+            minWidth: 150,
+            enableCellChangeFlash: false,
+            headerClass: 'custom-header-blue',
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
+            hide: activeTab === 'Tab1' ? false : true,
+        })),
         { headerName: "Fund", field: "fm_new", enableCellChangeFlash: false, filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.fm_new) },
             cellEditor: AutocompleteCellEditor, cellEditorParams: { values: rowData.map(r => r.fm_new) } },
         { headerName: "Top",  field: "top",  filter: ExcelStyleFilter, filterParams: { values: rowData.map(r => r.top) }, minWidth:90, hide: !isTab2, cellEditor: "agSelectCellEditor", enableCellChangeFlash: false,
@@ -579,6 +650,7 @@ export default function Show() {
                     enableCellChangeFlash: false,
                     hide: !isTab2,
                     comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
+                    headerComponentParams: { formula: `Sum of the 12 monthly Cost values for ${year}` },
                 }
             )
         }
@@ -613,7 +685,8 @@ export default function Show() {
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
                         'positive-value': params => params.value >= 0
-                    }
+                    },
+                    headerComponentParams: { formula: `Cost - ${year} (planned) − Total (sum of monthly Cost values for ${year})` },
                 }
             )
         }
@@ -632,7 +705,8 @@ export default function Show() {
             headerClass:'custom-header-green-group',
             cellClass: 'cell-dark-green',
             hide: activeTab === 'Tab1' ? false : true,
-            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
+            headerComponentParams: { formula: `Sum of Cost - {year} for every year from ${startYear} to ${endYear}` },
         },
         {
             headerName: "Cost Remaining",
@@ -641,6 +715,7 @@ export default function Show() {
             filterParams: { values: rowData.map(r => r.cost_remaining) },
             minWidth: 150,
             editable: false,
+            headerComponentParams: { formula: `Available Budget 5YP (Cost) − Cost ${startYear}-${endYear}` },
             headerClass:'custom-header-green',
             // Base tint matches the rest of the Cost columns; cellClassRules
             // below still wins (its colors are !important) when the value is
@@ -670,6 +745,7 @@ export default function Show() {
                     enableCellChangeFlash: false,
                     hide: !isTab2,
                     comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
+                    headerComponentParams: { formula: `Sum of the 12 monthly Cash values for ${year}` },
                 }
             )
         }
@@ -701,7 +777,8 @@ export default function Show() {
                     cellClassRules: {
                         'negative-value': params => params.value < 0,
                         'positive-value': params => params.value >= 0
-                    }
+                    },
+                    headerComponentParams: { formula: `Cash - ${year} (planned) − Total Cash (sum of monthly Cash values for ${year})` },
                 }
             )
         }
@@ -719,7 +796,8 @@ export default function Show() {
             headerClass:'custom-header-orange-group',
             cellClass: 'cell-dark-orange',
             hide: activeTab === 'Tab1' ? false : true,
-            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value)
+            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
+            headerComponentParams: { formula: `Sum of Cash - {year} for every year from ${startYear} to ${endYear}` },
         },
         {
             headerName: "Cash Remaining",
@@ -728,6 +806,7 @@ export default function Show() {
             filterParams: { values: rowData.map(r => r.cash_remaining) },
             minWidth: 150,
             editable:false,
+            headerComponentParams: { formula: `Available Budget 5YP (Cash) − Cash ${startYear}-${endYear}` },
             enableCellChangeFlash: false,
             headerClass:'custom-header-orange',
             // See Cost Remaining above — base tint matches the Cash columns,
@@ -741,20 +820,6 @@ export default function Show() {
             }
         }
     )
-
-    for (let year = startYear - 1; year <= startYear; year++) {
-        columnDefs.push({
-            headerName: `Commitment - ${year}`,
-            field: `commitment_${year}`,
-            filter: ExcelStyleFilter,
-            filterParams: { values: rowData.map(r => r[`commitment_${year}`]) },
-            minWidth: 150,
-            enableCellChangeFlash: false,
-            headerClass: 'custom-header-blue',
-            comparator: numericComparator, valueFormatter: params => formatCurrency(params.value),
-            hide: activeTab === 'Tab1' ? false : true,
-        });
-    }
 
     // Bakes the persisted hide preference into columnDefs itself (see
     // hiddenColumnsPref above) rather than relying on a one-off imperative
@@ -1002,12 +1067,72 @@ export default function Show() {
             setLoading(false)
             setIsLatestVersion(e.target.value == response.data.latestVersion);
             setIsFinal(response.data.approvalStatus === 'final');
+            setAutoExportEnabled(!!response.data.autoExportEnabled);
+            setAutoExportInterval(response.data.autoExportIntervalMinutes || 15);
         } else {
             Swal.fire('Error', response.message, 'warning');
             setLoading(false)
         }
 
     }
+
+    // Toggle/interval both write to the same endpoint — the backend only
+    // treats `interval_minutes` as a real change when it's actually present
+    // in the request, so flipping the toggle off doesn't need to resend it.
+    const handleToggleAutoExport = async (checked) => {
+        setAutoExportSaving(true);
+        try {
+            const res = await axios.put(`/budgets-auto-export/${startYear}/${versionBudgetPeriod}`, {
+                enabled: checked,
+                interval_minutes: autoExportInterval,
+            });
+            setAutoExportEnabled(res.data.auto_export_enabled);
+            setAutoExportInterval(res.data.auto_export_interval_minutes || autoExportInterval);
+        } catch (e) {
+            Swal.fire('Error', e.response?.data?.message || 'Failed to update auto-backup setting.', 'error');
+        } finally {
+            setAutoExportSaving(false);
+        }
+    };
+
+    const handleChangeAutoExportInterval = async (minutes) => {
+        setAutoExportInterval(minutes);
+        if (!autoExportEnabled) return; // just remember the choice locally until the toggle is actually turned on
+        setAutoExportSaving(true);
+        try {
+            const res = await axios.put(`/budgets-auto-export/${startYear}/${versionBudgetPeriod}`, {
+                enabled: true,
+                interval_minutes: minutes,
+            });
+            setAutoExportEnabled(res.data.auto_export_enabled);
+            setAutoExportInterval(res.data.auto_export_interval_minutes || minutes);
+        } catch (e) {
+            Swal.fire('Error', e.response?.data?.message || 'Failed to update auto-backup interval.', 'error');
+        } finally {
+            setAutoExportSaving(false);
+        }
+    };
+
+    const fetchAutoExportFiles = async () => {
+        setAutoExportFilesLoading(true);
+        try {
+            const res = await axios.get(`/budgets-auto-export/${startYear}/${versionBudgetPeriod}`);
+            setAutoExportFiles(res.data.data || []);
+        } catch (e) {
+            setAutoExportFiles([]);
+        } finally {
+            setAutoExportFilesLoading(false);
+        }
+    };
+
+    const handleOpenAutoExport = () => {
+        setShowAutoExport(true);
+        fetchAutoExportFiles();
+    };
+
+    const handleDownloadAutoExportFile = (id) => {
+        window.open(`/budgets-auto-export/${startYear}/${versionBudgetPeriod}/${id}/download`, '_blank');
+    };
 
     const handleAddNewRow = () => {
         const newRow = {
@@ -1122,7 +1247,9 @@ export default function Show() {
             sap_code: 'Total',
             title: '',
             total_cash:0,
-            total_cost:0
+            total_cost:0,
+            cash_remaining:0,
+            cost_remaining:0
         };
         totals[`commitment_${startYear - 1}`] = 0;
         for(let i = startYear; i< endYear + 1; i++){
@@ -1154,11 +1281,24 @@ export default function Show() {
             }
             totals.total_cash += parseNumber(row.total_cash);
             totals.total_cost += parseNumber(row.total_cost);
+            totals.cash_remaining += parseNumber(row.cash_remaining);
+            totals.cost_remaining += parseNumber(row.cost_remaining);
         });
 
 
 
         return [totals];
+    };
+
+    // Marks a row as "just saved by this tab" so its own upcoming realtime
+    // broadcast doesn't get (redundantly) re-applied to itself. The 8s
+    // fallback removal exists so a row can never get stuck permanently
+    // ignoring real updates (e.g. from another user) if this specific
+    // broadcast is delayed or never arrives.
+    const markRecentlySaved = (id) => {
+        if (id === undefined || id === null) return;
+        recentlySavedIds.current.add(id);
+        setTimeout(() => recentlySavedIds.current.delete(id), 8000);
     };
 
     const parseNumber = (val) => {
@@ -1167,11 +1307,48 @@ export default function Show() {
     };
 
     let suppressConfirm = false;
+    // Used by the auto-save path (onCellValueChanged, below) — sends one
+    // row's current data to the server exactly as a cell edit would, without
+    // re-deriving any of the field-specific recompute logic (that already
+    // happened live; this just persists whatever the row currently holds).
+    // `changedFields`, when provided, tells the backend to only persist that
+    // subset of the payload instead of the whole row. The payload itself
+    // still carries the full row (some backend logic needs it, e.g. deriving
+    // year_period), but without this restriction every single-cell edit
+    // would resend a full — and potentially stale — snapshot of the row and
+    // silently overwrite any field another user changed moments earlier.
+    // Only used for updates to an already-existing row; a brand-new row's
+    // first save (create) intentionally omits it to persist everything.
+    const saveRowToServer = async (rowData, changedFields) => {
+        const isNew = !rowData.id;
+        const payload = { ...rowData, year_period: startYear };
+        if (!isNew && changedFields) {
+            payload.changed_fields = changedFields;
+        }
+        const url = isNew ? '/budgets' : `/budgets/${rowData.id}`;
+        const method = isNew ? 'post' : 'put';
+        const response = await axios({
+            method,
+            url,
+            data: payload,
+            headers: { 'Accept': 'application/json' },
+        });
+        return response.data;
+    };
+
     const onCellValueChanged = async (params) => {
         const { data, colDef, api, node } = params;
         const field = params.colDef.field;
         const oldValue = params.oldValue;
         const newValue = params.newValue;
+
+        // Snapshot the row *before* this handler's cascading recalculations
+        // (updateTotal, budgetDistribute, etc.) run, so we can diff against
+        // it right before saving. `data[field]` has already been mutated to
+        // `newValue` by AG Grid itself before this handler even fires, so it
+        // won't show up in that diff — `field` is added to the whitelist
+        // explicitly below instead.
+        const dataBeforeCascade = { ...data };
 
 
         // if (suppressConfirm) {
@@ -1490,46 +1667,104 @@ export default function Show() {
 
         clearTimeout(saveStatusTimeout.current);
         setSaveStatus('saving');
-        try {
-            const isNew = !data.id; // if no ID, it's new
-            data['year_period'] = startYear
-            const url = isNew ? '/budgets' : `/budgets/${data.id}`;
-            const method = isNew ? 'post' : 'put';
+        const isNew = !data.id; // if no ID, it's new
 
-            const response = await axios({
-                method: method,
-                url: url,
-                data: data, // axios will handle JSON automatically
-                headers: {
-                    'Accept': 'application/json'
+        // The actual save — reads whatever `data` holds at the moment it
+        // *runs*, not at the moment it was scheduled (see the debounce
+        // below), since `data` is the same live object AG Grid keeps
+        // mutating in place as the user keeps typing. `wasNew` is checked
+        // fresh here (not the outer `isNew` const) because performSave can
+        // be invoked again later, after `data.id` has already been set by
+        // an earlier call — see the create-lock handling below.
+        const performSave = async () => {
+            const wasNew = !data.id;
+            // Only the fields this specific edit (plus whatever it cascaded
+            // into — totals, remaining, monthly splits, etc.) actually
+            // touched, computed by diffing against the pre-cascade snapshot
+            // taken at the top of this handler. `field` is added explicitly
+            // since AG Grid already applies it to `data` before this handler
+            // runs, so it wouldn't show up in the diff itself. Not used for
+            // a brand-new row's first save (create) — that one legitimately
+            // needs to persist everything.
+            const changedFields = wasNew ? undefined : Array.from(new Set([
+                field,
+                ...Object.keys(data).filter((k) => data[k] !== dataBeforeCascade[k]),
+            ]));
+            try {
+                const result = await saveRowToServer(data, changedFields);
+
+                if (!result.success) {
+                    console.error("Failed to update budget record:", result);
+                    alert(result.message || "An error occurred while updating the data. Please try again.");
+                    setSaveStatus('error');
+                    return;
                 }
-            });
 
-            const result = response.data;
-            if (!result.success) {
-                console.error("Failed to update budget record:", result);
-                alert(result.message || "An error occurred while updating the data. Please try again.");
+                if (wasNew && result.data?.id) {
+                    // Remove the old (id-less) node first, using the same
+                    // object reference AG Grid still has cached under its
+                    // id-less row id, *then* stamp the real id onto `data`
+                    // so any edit that was waiting on this row's create-lock
+                    // sees it immediately, and finally re-add it as the new
+                    // row identity.
+                    agGridRef.current.api.applyTransaction({ remove: [data] });
+                    data.id = result.data.id;
+                    markRecentlySaved(data.id);
+                    agGridRef.current.api.applyTransaction({ add: [data], addIndex: 0 });
+                } else {
+                    markRecentlySaved(data.id);
+                }
+
+                console.log(result.message);
+                recomputeKpiTotals();
+                setSaveStatus('saved');
+                saveStatusTimeout.current = setTimeout(() => setSaveStatus('idle'), 2500);
+            } catch (error) {
+                console.error("Update error:", error);
                 setSaveStatus('error');
+            }
+        };
+
+        if (isNew) {
+            // A brand-new row has no id yet, so every cell edited before the
+            // *first* save round-trips would otherwise each independently
+            // see isNew=true and POST /budgets — creating a separate
+            // duplicate project per keystroke instead of one.
+            //
+            // A plain debounce timer isn't enough: once the timer *fires* it
+            // stops being "pending" even though the POST it kicked off is
+            // still in flight (awaiting the server), so an edit arriving
+            // during that window would see no pending timer and schedule its
+            // own — still creating a duplicate. Instead we hold a lock (a
+            // promise) for this row's *entire* create lifecycle — debounce
+            // delay plus the request itself. Any edit that arrives while the
+            // lock is held just awaits it instead of starting a new request.
+            //
+            // Once the lock resolves, `data.id` is set in place (see
+            // performSave above) if creation succeeded. A late edit's field
+            // change was already applied to `data` by AG Grid before this
+            // handler ran, but if it arrived after the in-flight request's
+            // payload was already read, it wouldn't be part of that request
+            // — so after the lock resolves we fall through and save again,
+            // which is now a normal PUT (data.id is set) rather than a
+            // second POST.
+            if (pendingCreateLocks.current.has(data)) {
+                await pendingCreateLocks.current.get(data);
+            } else {
+                const lockPromise = new Promise((resolve) => {
+                    setTimeout(async () => {
+                        await performSave();
+                        pendingCreateLocks.current.delete(data);
+                        resolve();
+                    }, 500);
+                });
+                pendingCreateLocks.current.set(data, lockPromise);
+                await lockPromise;
                 return;
             }
-
-            if (isNew && result.data?.id) {
-                agGridRef.current.api.applyTransaction({ remove: [params.data] });
-                const newRow = { ...data, id: result.data.id };
-                lastUpdatedId.current = newRow.id;
-                agGridRef.current.api.applyTransaction({ add: [newRow], addIndex: 0 });
-            } else {
-                lastUpdatedId.current = data.id;
-            }
-
-            console.log(result.message);
-            recomputeKpiTotals();
-            setSaveStatus('saved');
-            saveStatusTimeout.current = setTimeout(() => setSaveStatus('idle'), 2500);
-        } catch (error) {
-            console.error("Update error:", error);
-            setSaveStatus('error');
         }
+
+        await performSave();
     };
 
     const handleViewTrend = () => {
@@ -1984,6 +2219,15 @@ export default function Show() {
                                 )}
                                 {!isViewer && (
                                     <button
+                                        onClick={handleOpenAutoExport}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container text-left"
+                                    >
+                                        <span className={`material-symbols-outlined text-[18px] ${autoExportEnabled ? 'text-primary' : 'opacity-70'}`}>schedule</span>
+                                        Auto Backup{autoExportEnabled ? ` (on, every ${autoExportInterval}m)` : ''}
+                                    </button>
+                                )}
+                                {!isViewer && (
+                                    <button
                                         onClick={handleDuplicateRow}
                                         className="flex w-full items-center gap-2 px-4 py-2 text-sm text-secondary hover:bg-surface-container text-left"
                                     >
@@ -2236,6 +2480,80 @@ export default function Show() {
                 onSubmit={handleImport}
                 loading={loading}
             />
+
+            <Modal show={showAutoExport} onClose={() => setShowAutoExport(false)} maxWidth="md">
+                <div className="p-6 space-y-4">
+                    <h3 className="font-title-sm text-title-sm text-on-surface">Auto Backup</h3>
+                    <p className="text-body-sm text-on-surface-variant">
+                        Automatically generates an Excel backup of {startYear} v{versionBudgetPeriod} on a timer, in the background — no need to keep this page open. Separate from the manual "Export Data" button above.
+                    </p>
+
+                    <div className="flex items-center justify-between border border-outline-variant rounded-lg px-4 py-3">
+                        <div>
+                            <p className="text-sm font-medium text-on-surface">Enable auto backup</p>
+                            <p className="text-xs text-on-surface-variant">Keeps the last 20 backups for this version.</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={autoExportEnabled}
+                                disabled={autoExportSaving}
+                                onChange={(e) => handleToggleAutoExport(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-surface-container-high rounded-full peer peer-checked:bg-primary transition-all after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-on-surface-variant mb-1">Interval</label>
+                        <select
+                            value={autoExportInterval}
+                            onChange={(e) => handleChangeAutoExportInterval(Number(e.target.value))}
+                            disabled={autoExportSaving}
+                            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                        >
+                            <option value={15}>Every 15 minutes</option>
+                            <option value={30}>Every 30 minutes</option>
+                            <option value={60}>Every hour</option>
+                            <option value={120}>Every 2 hours</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <p className="text-sm font-medium text-on-surface-variant mb-2">Recent backups</p>
+                        {autoExportFilesLoading ? (
+                            <div className="flex justify-center py-4"><Spinner /></div>
+                        ) : autoExportFiles.length === 0 ? (
+                            <p className="text-xs text-on-surface-variant italic">No backups generated yet.</p>
+                        ) : (
+                            <ul className="max-h-48 overflow-y-auto divide-y divide-outline-variant border border-outline-variant rounded-lg">
+                                {autoExportFiles.map((f) => (
+                                    <li key={f.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                                        <span>{new Date(f.created_at).toLocaleString()} ({(f.file_size / 1024).toFixed(0)} KB)</span>
+                                        <button
+                                            onClick={() => handleDownloadAutoExportFile(f.id)}
+                                            className="text-primary hover:underline text-xs font-medium"
+                                        >
+                                            Download
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowAutoExport(false)}
+                            className="px-4 py-2 bg-surface-container text-on-surface-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-container-high transition-all"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal show={showFindReplace} onClose={() => { if (!findReplaceLoading) setShowFindReplace(false); }} maxWidth="md">
                 <div className="p-6 space-y-4">

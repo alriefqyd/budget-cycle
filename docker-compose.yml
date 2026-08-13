@@ -52,6 +52,23 @@ services:
         networks:
             - app-network
 
+    # Runs `php artisan schedule:run` every minute so scheduled commands
+    # (bootstrap/app.php's ->withSchedule(), e.g. exports:run-auto for the
+    # Auto Backup feature) actually fire — there's no host cron in this dev
+    # setup to do it otherwise. Same image/volume as `app`, just a different
+    # command instead of php-fpm.
+    scheduler:
+        container_name: scheduler_budget_cycle
+        build:
+            context: .
+        volumes:
+            - .:/var/www
+        depends_on:
+            - db
+        networks:
+            - app-network
+        command: sh -c "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
+
 networks:
     app-network:
         driver: bridge

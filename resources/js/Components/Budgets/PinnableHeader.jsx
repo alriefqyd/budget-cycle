@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, EyeOff, Filter, MoreVertical, Pin, PinOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ArrowDown, ArrowUp, EyeOff, Filter, Info, MoreVertical, Pin, PinOff } from "lucide-react";
 import Dropdown from "@/Components/Dropdown.jsx";
 
 // Below this column width, the filter/pin/hide icon row no longer fits next
@@ -8,12 +9,15 @@ import Dropdown from "@/Components/Dropdown.jsx";
 const NARROW_WIDTH_THRESHOLD = 110;
 
 export default function PinnableHeader(props) {
-    const { displayName, column, api, enableSorting, progressSort, showColumnMenu } = props;
+    const { displayName, column, api, enableSorting, progressSort, showColumnMenu, formula } = props;
     const hasFilter = !!column.getColDef().filter;
     const [sortDirection, setSortDirection] = useState(column.getSort());
     const [pinned, setPinned] = useState(column.getPinned());
     const [filterActive, setFilterActive] = useState(column.isFilterActive());
     const [width, setWidth] = useState(column.getActualWidth());
+    const [formulaOpen, setFormulaOpen] = useState(false);
+    const [formulaPos, setFormulaPos] = useState(null);
+    const infoBtnRef = useRef(null);
 
     useEffect(() => {
         const onSortChanged = () => setSortDirection(column.getSort());
@@ -31,6 +35,31 @@ export default function PinnableHeader(props) {
             column.removeEventListener('widthChanged', onWidthChanged);
         };
     }, [column]);
+
+    // The formula popup itself is rendered via a portal straight onto
+    // <body> (see below) so ag-grid's `overflow: hidden` header cells don't
+    // clip it — but that means it no longer scrolls/resizes with the grid,
+    // so it just closes on either instead of drifting away from the icon
+    // that opened it.
+    useEffect(() => {
+        if (!formulaOpen) return;
+        const close = () => setFormulaOpen(false);
+        window.addEventListener('scroll', close, true);
+        window.addEventListener('resize', close);
+        return () => {
+            window.removeEventListener('scroll', close, true);
+            window.removeEventListener('resize', close);
+        };
+    }, [formulaOpen]);
+
+    const toggleFormula = (e) => {
+        e.stopPropagation();
+        if (!formulaOpen && infoBtnRef.current) {
+            const rect = infoBtnRef.current.getBoundingClientRect();
+            setFormulaPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+        }
+        setFormulaOpen(o => !o);
+    };
 
     const onLabelClick = (e) => {
         if (!enableSorting) return;
@@ -66,6 +95,32 @@ export default function PinnableHeader(props) {
                 {sortDirection === 'asc' && <ArrowUp size={12} className="shrink-0" />}
                 {sortDirection === 'desc' && <ArrowDown size={12} className="shrink-0" />}
             </span>
+
+            {formula && (
+                <>
+                    <button
+                        ref={infoBtnRef}
+                        type="button"
+                        onClick={toggleFormula}
+                        title="How this value is calculated"
+                        className="p-0.5 rounded hover:bg-black/10 opacity-50 hover:opacity-100 text-primary transition-opacity shrink-0"
+                    >
+                        <Info size={13} />
+                    </button>
+                    {formulaOpen && formulaPos && createPortal(
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setFormulaOpen(false)} />
+                            <div
+                                className="fixed z-50 p-3 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 bg-white text-on-surface-variant normal-case font-normal text-xs leading-snug max-w-[240px] whitespace-normal"
+                                style={{ top: formulaPos.top, right: formulaPos.right }}
+                            >
+                                {formula}
+                            </div>
+                        </>,
+                        document.body
+                    )}
+                </>
+            )}
 
             {isNarrow ? (
                 hasActions && (
