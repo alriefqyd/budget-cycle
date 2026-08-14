@@ -19,9 +19,9 @@
     --ag-header-column-separator-height: 55%;
 
     /* Rows */
-    --ag-odd-row-background-color: #f8f9ff; /* surface */
-    --ag-row-hover-color: rgba(0, 99, 96, 0.06);
-    --ag-selected-row-background-color: rgba(0, 126, 122, 0.12);
+    --ag-odd-row-background-color: #f4f6fd; /* lighter striping against white even rows */
+    --ag-row-hover-color: rgba(0, 99, 96, 0.2);
+    --ag-selected-row-background-color: rgba(0, 126, 122, 0.75);
     --ag-range-selection-border-color: #006360;
 
     /* Inputs / selection controls */
@@ -187,7 +187,7 @@
    header) — a light tint of the same family so the total figure is easy to
    spot scanning down the grid, distinct from the plain-white per-year cells. */
 .total-cell-green {
-    background-color: #d7f7ea !important;
+    background-color: #8ce8c3 !important;
     font-weight: 700 !important;
 }
 

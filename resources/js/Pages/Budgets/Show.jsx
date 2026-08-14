@@ -1,6 +1,7 @@
 import {useEffect, useState, useRef, useMemo} from "react"
 import {Link, usePage} from "@inertiajs/react"
 import { AgGridReact } from "ag-grid-react"
+import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import "../../../css/ag-grid-custom.css";
 
@@ -238,7 +239,7 @@ export default function Show() {
     const [deletingData, setDeletingData] = useState(false);
     const [deletingRowId, setDeletingRowId] = useState(null);
     const [deletingCount, setDeletingCount] = useState(0);
-    const [kpiTotals, setKpiTotals] = useState({ fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 });
+    const [kpiTotals, setKpiTotals] = useState({ fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0, ongoingCash: 0, ongoingCost: 0, newCash: 0, newCost: 0 });
     const [historyProject, setHistoryProject] = useState(null);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -282,7 +283,7 @@ export default function Show() {
     const recomputeKpiTotals = () => {
         const api = agGridRef.current?.api;
         if (!api) return;
-        const totals = { fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0 };
+        const totals = { fiveYpCash: 0, fiveYpCost: 0, yearCash: 0, yearCost: 0, actual: 0, actualCost: 0, remaining: 0, count: 0, ongoingCash: 0, ongoingCost: 0, newCash: 0, newCost: 0 };
         api.forEachNodeAfterFilter((node) => {
             if (node.data?.sap_code === 'Total') return;
             totals.fiveYpCash += parseNumber(node.data?.total_cash);
@@ -293,6 +294,15 @@ export default function Show() {
             totals.actualCost += parseNumber(node.data?.actual_to_date_cost);
             totals.remaining += parseNumber(node.data?.budget_5yp);
             totals.count += 1;
+
+            const status = (node.data?.status_progress || '').toLowerCase().replace(/\s+/g, '');
+            if (status === 'ongoing') {
+                totals.ongoingCash += parseNumber(node.data?.[`cash_${startYear}`]);
+                totals.ongoingCost += parseNumber(node.data?.[`cost_${startYear}`]);
+            } else if (status === 'new' || status === 'new27') {
+                totals.newCash += parseNumber(node.data?.[`cash_${startYear}`]);
+                totals.newCost += parseNumber(node.data?.[`cost_${startYear}`]);
+            }
         });
         setKpiTotals(totals);
     };
@@ -2340,28 +2350,32 @@ export default function Show() {
 
                     <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
                         <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-on-secondary-container text-[16px]">history</span>
+                            <span className="material-symbols-outlined text-on-secondary-container text-[16px]">autorenew</span>
                         </div>
                         <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Actual to Date</p>
-                            <p className="text-lg font-semibold text-on-surface truncate" title={`Cash: ${formatCurrency(kpiTotals.actual)}`}>
-                                {formatCompactCurrency(kpiTotals.actual)}
-                                <span className="text-body-sm font-normal text-on-surface-variant"> Cash</span>
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Ongoing Budget {startYear}</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={`Ongoing Cash: ${formatCurrency(kpiTotals.ongoingCash)}`}>
+                                {formatCompactCurrency(kpiTotals.ongoingCash)}
+                                <span className="text-body-sm font-normal text-on-surface-variant"> Ongoing Cash</span>
                             </p>
-                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Cost: ${formatCurrency(kpiTotals.actualCost)}`}>
-                                {formatCompactCurrency(kpiTotals.actualCost)} Cost
+                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`Ongoing Cost: ${formatCurrency(kpiTotals.ongoingCost)}`}>
+                                {formatCompactCurrency(kpiTotals.ongoingCost)} Ongoing Cost
                             </p>
                         </div>
                     </div>
 
                     <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-2.5 flex items-center gap-2.5 hover:shadow-md transition-shadow">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${kpiTotals.remaining < 0 ? 'bg-error/15' : 'bg-tertiary-container'}`}>
-                            <span className={`material-symbols-outlined text-[16px] ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-tertiary-container'}`}>savings</span>
+                        <div className="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-on-tertiary-container text-[16px]">fiber_new</span>
                         </div>
                         <div className="min-w-0">
-                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">Remaining Forecast (Unused)</p>
-                            <p className={`text-lg font-semibold truncate ${kpiTotals.remaining < 0 ? 'text-error' : 'text-on-surface'}`} title={formatCurrency(kpiTotals.remaining)}>
-                                {formatCompactCurrency(kpiTotals.remaining)}
+                            <p className="font-label-caps text-label-caps text-on-surface-variant truncate">New Budget {startYear}</p>
+                            <p className="text-lg font-semibold text-on-surface truncate" title={`New Cash: ${formatCurrency(kpiTotals.newCash)}`}>
+                                {formatCompactCurrency(kpiTotals.newCash)}
+                                <span className="text-body-sm font-normal text-on-surface-variant"> New Cash</span>
+                            </p>
+                            <p className="font-body-sm text-body-sm text-on-surface-variant truncate" title={`New Cost: ${formatCurrency(kpiTotals.newCost)}`}>
+                                {formatCompactCurrency(kpiTotals.newCost)} New Cost
                             </p>
                         </div>
                     </div>
@@ -2428,6 +2442,7 @@ export default function Show() {
                              style={{height: "calc(100vh - 260px)", width: "100%"}}>
                             <AgGridReact
                                 ref={agGridRef}
+                                theme="legacy"
                                 rowData={rowData}
                                 columnDefs={columnDefs}
                                 defaultColDef={{
