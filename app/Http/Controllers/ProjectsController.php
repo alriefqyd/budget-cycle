@@ -318,6 +318,21 @@ class ProjectsController extends Controller
         $period = BudgetCyclePeriod::where('start_year', $year)->where('version', $version)->firstOrFail();
         $export = $period->autoExports()->findOrFail($exportId);
 
+        // The DB row can outlive the physical file (e.g. a prune pass that
+        // deleted the file but failed before removing its row, or something
+        // outside Laravel touching storage/app/private directly) — without
+        // this check, Storage::download() throws League\Flysystem's raw
+        // UnableToRetrieveMetadata straight through to a 500 page.
+        if (!Storage::disk('local')->exists($export->disk_path)) {
+            Log::warning("Auto-export file missing from disk for BudgetAutoExport #{$export->id}: {$export->disk_path}");
+
+            return response()->json([
+                'success' => false,
+                'message' => 'This backup file is no longer available on disk. It may have been cleaned up automatically — please choose another backup.',
+                'data' => false,
+            ], 404);
+        }
+
         return Storage::disk('local')->download($export->disk_path, basename($export->disk_path));
     }
 

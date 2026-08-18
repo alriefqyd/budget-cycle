@@ -87,8 +87,17 @@ class RunAutoExports extends Command
             ->get();
 
         foreach ($stale as $old) {
-            Storage::disk('local')->delete($old->disk_path);
-            $old->delete();
+            // Delete the DB row first: if it fails, the file is still there
+            // and the row still points to it (safe, just retried next run).
+            // Deleting storage first and having the row-delete fail would
+            // orphan the row against a now-missing file — exactly the
+            // mismatch that made downloadAutoExport() 500 in production.
+            try {
+                $old->delete();
+                Storage::disk('local')->delete($old->disk_path);
+            } catch (\Throwable $e) {
+                Log::error("Failed to prune auto-export #{$old->id} ({$old->disk_path}): " . $e->getMessage());
+            }
         }
     }
 }
