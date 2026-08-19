@@ -6,7 +6,7 @@ import EmptyChartState from '@/Components/EmptyChartState.jsx';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
 
 const SERIES_PLAN = '#2a78d6';
-const SERIES_PRIOR = '#1baf7a';
+const SERIES_PRIOR = '#9ca3af';
 
 const formatMillions = (value) => {
     if (value == null || isNaN(value)) return '-';
@@ -33,17 +33,17 @@ export default function BarChart({dataChart, chartName, cols, year}) {
         labels: yearlyLabels,
         datasets: [
             {
-                label: `Plan ${startYear}-${endYear}`,
-                data: yearlyPlan,
-                backgroundColor: SERIES_PLAN,
+                label: `Prior Cycle ${priorCycleStart}-${priorCycleEnd}`,
+                data: yearlyApproved,
+                backgroundColor: SERIES_PRIOR,
                 borderRadius: 4,
                 borderSkipped: false,
                 maxBarThickness: 40,
             },
             {
-                label: `Prior Cycle ${priorCycleStart}-${priorCycleEnd}`,
-                data: yearlyApproved,
-                backgroundColor: SERIES_PRIOR,
+                label: `Plan ${startYear}-${endYear}`,
+                data: yearlyPlan,
+                backgroundColor: SERIES_PLAN,
                 borderRadius: 4,
                 borderSkipped: false,
                 maxBarThickness: 40,
